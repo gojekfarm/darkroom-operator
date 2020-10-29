@@ -2,7 +2,8 @@
 
 A Kubernetes Operator to put [Darkroom](https://github.com/gojek/darkroom) on Autopilot
 
-[![Build Status](https://github.com/gojekfarm/darkroom-operator/workflows/pipeline/badge.svg)](https://github.com/gojekfarm/darkroom-operator/actions)
+[![Build Status](https://github.com/gojekfarm/darkroom-operator/workflows/Build/badge.svg)](https://github.com/gojekfarm/darkroom-operator/actions)
+[![Test Status](https://github.com/gojekfarm/darkroom-operator/workflows/Test/badge.svg)](https://github.com/gojekfarm/darkroom-operator/actions)
 [![Coverage Status](https://coveralls.io/repos/github/gojekfarm/darkroom-operator/badge.svg?branch=master)](https://coveralls.io/github/gojekfarm/darkroom-operator?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/gojekfarm/darkroom-operator)](https://goreportcard.com/report/github.com/gojekfarm/darkroom-operator)
 [![GitHub Release](https://img.shields.io/github/release/gojekfarm/darkroom-operator.svg?style=flat)](https://github.com/gojekfarm/darkroom-operator/releases)
