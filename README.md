@@ -18,6 +18,16 @@ This operator aims to make to it easy to deploy Darkroom in a Kubernetes Cluster
 
 TBD
 
+## Dev Environment Setup
+
+#### Install [Operator SDK](https://sdk.operatorframework.io/docs/installation/install-operator-sdk/)
+
+```shell script
+brew install operator-sdk
+```
+
+> Note: We recommend going through operator-sdk [getting started](https://sdk.operatorframework.io/docs/building-operators/golang/quickstart/) guide if you are new to operator development
+
 ### Contributing Guide
 
 Read our [contributing guide](./CONTRIBUTING.md) to learn about our development process, how to propose bugfixes and improvements, and how to build and test your changes to Darkroom Operator.
