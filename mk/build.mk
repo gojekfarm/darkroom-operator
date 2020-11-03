@@ -28,3 +28,14 @@ clean: clean/build ## Dev: Clean
 .PHONY: clean/build
 clean/build: ## Dev: Remove .out/ dir
 	@rm -rf $(BUILD_DIR)
+
+
+KUBEBUILDER := $(shell command -v /usr/local/kubebuilder/bin/kubebuilder 2> /dev/null)
+
+# download kubebuilder if necessary
+kubebuilder:
+ifndef KUBEBUILDER
+	@bin/install-kubebuilder
+else
+KUBEBUILDER := /usr/local/kubebuilder/bin/kubebuilder
+endif

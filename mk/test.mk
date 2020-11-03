@@ -1,7 +1,7 @@
 GO_TEST := go test $(GOFLAGS) $(LD_FLAGS)
 
 .PHONY: test-ci
-test-ci: check test ## CI: Run tests for all modules and report coverage
+test-ci: kubebuilder check test ## CI: Run tests for all modules and report coverage
 
 .PHONY: test
 test: ## Dev: Run tests for all modules

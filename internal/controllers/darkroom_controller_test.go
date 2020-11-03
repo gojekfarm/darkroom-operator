@@ -26,8 +26,14 @@ package controllers
 
 import (
 	"bytes"
+	"context"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/stretchr/testify/suite"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -43,10 +49,13 @@ import (
 
 type DarkroomControllerSuite struct {
 	suite.Suite
-	cfg       *rest.Config
-	k8sClient client.Client
-	testEnv   *envtest.Environment
-	buf       *bytes.Buffer
+	cfg        *rest.Config
+	k8sClient  client.Client
+	testEnv    *envtest.Environment
+	buf        *bytes.Buffer
+	stopCh     chan struct{}
+	mgr        ctrl.Manager
+	reconciler *DarkroomReconciler
 }
 
 func TestDarkroomControllerSuite(t *testing.T) {
@@ -54,10 +63,12 @@ func TestDarkroomControllerSuite(t *testing.T) {
 }
 
 func (s *DarkroomControllerSuite) SetupSuite() {
+	s.buf = &bytes.Buffer{}
 	logf.SetLogger(zap.New(zap.UseDevMode(true), zap.WriteTo(s.buf)))
 	s.testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{filepath.Join("..", "..", "config", "crd", "bases")},
 	}
+	s.stopCh = make(chan struct{})
 
 	var err error
 	s.cfg, err = s.testEnv.Start()
@@ -72,9 +83,45 @@ func (s *DarkroomControllerSuite) SetupSuite() {
 	s.k8sClient, err = client.New(s.cfg, client.Options{Scheme: scheme.Scheme})
 	s.NoError(err)
 	s.NotNil(s.k8sClient)
+
+	s.mgr, err = ctrl.NewManager(s.cfg, ctrl.Options{
+		Scheme: scheme.Scheme,
+	})
+	s.NoError(err)
+
+	s.reconciler = &DarkroomReconciler{
+		Client: s.k8sClient,
+		Log:    ctrl.Log.WithName("controllers").WithName("Darkroom"),
+		Scheme: scheme.Scheme,
+	}
+
+	s.NoError(s.reconciler.SetupWithManager(s.mgr))
+	go func() {
+		s.NoError(s.mgr.Start(s.stopCh))
+	}()
+}
+
+func (s *DarkroomControllerSuite) TestReconcile() {
+	darkroom := &deploymentsv1alpha1.Darkroom{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "darkroom-sample",
+			Namespace: "default",
+		},
+		Spec: deploymentsv1alpha1.DarkroomSpec{
+			Foo: "Bar",
+		},
+	}
+	s.NoError(s.k8sClient.Create(context.Background(), darkroom))
+
+	s.Eventually(func() bool {
+		// TODO: Assert actual object states when logic is added to Reconcile loop.
+		return strings.Contains(s.buf.String(), "Successfully Reconciled\t{\"reconcilerGroup\":"+
+			" \"deployments.gojek.io\", \"reconcilerKind\": \"Darkroom\", \"controller\": \"darkroom\","+
+			" \"name\": \"darkroom-sample\", \"namespace\": \"default\"}")
+	}, 2*time.Second, 100*time.Millisecond)
 }
 
 func (s *DarkroomControllerSuite) TearDownSuite() {
-	err := s.testEnv.Stop()
-	s.NoError(err)
+	close(s.stopCh)
+	s.NoError(s.testEnv.Stop())
 }
