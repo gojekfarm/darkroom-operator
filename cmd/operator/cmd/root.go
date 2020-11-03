@@ -8,6 +8,9 @@ import (
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	"github.com/gojekfarm/darkroom-operator/internal/controllers"
+	deploymentsv1alpha1 "github.com/gojekfarm/darkroom-operator/pkg/api/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -19,6 +22,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
+	utilruntime.Must(deploymentsv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -45,6 +49,14 @@ func newRootCmd(opts rootCmdOpts) *cobra.Command {
 				return err
 			}
 
+			if err = (&controllers.DarkroomReconciler{
+				Client: mgr.GetClient(),
+				Log:    ctrl.Log.WithName("controllers").WithName("Darkroom"),
+				Scheme: mgr.GetScheme(),
+			}).SetupWithManager(mgr); err != nil {
+				setupLog.Error(err, "unable to create controller", "controller", "Darkroom")
+				return err
+			}
 			// +kubebuilder:scaffold:builder
 
 			setupLog.Info("starting manager")

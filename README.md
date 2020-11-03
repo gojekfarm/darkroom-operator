@@ -28,6 +28,26 @@ brew install operator-sdk
 
 > Note: We recommend going through operator-sdk [getting started](https://sdk.operatorframework.io/docs/building-operators/golang/quickstart/) guide if you are new to operator development
 
+##### Install KubeBuilder
+
+Operator SDK uses `etcd` bundled with KubeBuilder, install it with `bin/install-kubebuilder`.
+> [Optional] Add `/usr/local/kubebuilder/bin` to your $PATH
+
+###### Creating New API Objects
+
+The structure of this project is different than other operator codebases you might be familiar with. Since this project also includes an API Server with GUI and makes use of same API definitions, we have kept it this way.
+
+To generate a new API object, run the command
+```shell script
+operator-sdk create api --group deployments --version v1alpha1 --kind Darkroom --resource=true --controller=true
+```
+
+This will generate the required resource definition and controller under `./api/` and `./controllers/`, move these to `./pkg/api/` and `./internal/controllers/` respectively. But the command will fail as there is no root level `main.go` file.
+
+The changes required in `main.go` are hence skipped and you must add the generated resource scheme to runtime scheme in `cmd/operator/cmd/root.go` and setup the Reconciler with the Controller Manager manually.
+
+You can run `make operator/generate` to generate necessary code by the `controller-gen`. And run `make operator/manifests` to generate the required YAML definitions.
+
 ### Contributing Guide
 
 Read our [contributing guide](./CONTRIBUTING.md) to learn about our development process, how to propose bugfixes and improvements, and how to build and test your changes to Darkroom Operator.
