@@ -36,13 +36,40 @@ spec:
         spec:
           description: DarkroomSpec defines the desired state of Darkroom
           properties:
-            foo:
-              description: Foo is an example field of Darkroom. Edit Darkroom_types.go
-                to remove/update
+            domains:
+              items:
+                type: string
+              minItems: 1
+              type: array
+            pathPrefix:
               type: string
+            source:
+              properties:
+                baseUrl:
+                  type: string
+                type:
+                  description: 'Type specifies storage backend to use with darkroom.
+                    Valid values are: - "WebFolder": simple storage backend to serve
+                    images from a hosted image source;'
+                  enum:
+                  - WebFolder
+                  type: string
+              required:
+              - type
+              type: object
+            version:
+              type: string
+          required:
+          - domains
+          - source
           type: object
         status:
           description: DarkroomStatus defines the observed state of Darkroom
+          properties:
+            domains:
+              items:
+                type: string
+              type: array
           type: object
       type: object
   version: v1alpha1

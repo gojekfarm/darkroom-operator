@@ -46,8 +46,14 @@ type DarkroomReconciler struct {
 // +kubebuilder:rbac:groups=deployments.gojek.io,resources=darkrooms/status,verbs=get;update;patch
 
 func (r *DarkroomReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	_ = context.Background()
+	ctx := context.Background()
 	_ = r.Log.WithValues("darkroom", req.NamespacedName)
+	var darkroom deploymentsv1alpha1.Darkroom
+
+	_ = r.Get(ctx, req.NamespacedName, &darkroom)
+
+	darkroom.Status.Domains = darkroom.Spec.Domains
+	_ = r.Status().Update(ctx, &darkroom)
 	return ctrl.Result{}, nil
 }
 

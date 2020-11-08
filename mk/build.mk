@@ -22,6 +22,9 @@ GOFLAGS :=
 .PHONY: build
 build: operator/manager/build ## Dev: Build all binaries
 
+.PHONY: generate
+generate: operator/generate operator/manifests ## Dev: Generate required code and manifests
+
 .PHONY: clean
 clean: clean/build ## Dev: Clean
 

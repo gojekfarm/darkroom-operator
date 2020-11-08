@@ -28,7 +28,6 @@ import (
 	"bytes"
 	"context"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -101,24 +100,62 @@ func (s *DarkroomControllerSuite) SetupSuite() {
 	}()
 }
 
+func (s *DarkroomControllerSuite) SetupTest() {
+	s.buf.Reset()
+}
+
 func (s *DarkroomControllerSuite) TestReconcile() {
-	darkroom := &deploymentsv1alpha1.Darkroom{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "darkroom-sample",
-			Namespace: "default",
-		},
-		Spec: deploymentsv1alpha1.DarkroomSpec{
-			Foo: "Bar",
+	testcases := []struct {
+		name             string
+		ctx              context.Context
+		darkroom         *deploymentsv1alpha1.Darkroom
+		preReconcileRun  func(context.Context, client.Client, *deploymentsv1alpha1.Darkroom) error
+		postReconcileRun func(context.Context, client.Client, *deploymentsv1alpha1.Darkroom) error
+	}{
+		{
+			name: "Darkroom object status contains domain list",
+			ctx:  context.Background(),
+			darkroom: &deploymentsv1alpha1.Darkroom{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "darkroom-sample",
+					Namespace: "default",
+				},
+				Spec: deploymentsv1alpha1.DarkroomSpec{
+					Source: deploymentsv1alpha1.Source{
+						Type: deploymentsv1alpha1.WebFolder,
+						WebFolderMeta: deploymentsv1alpha1.WebFolderMeta{
+							BaseURL: "https://example.com/assets/images",
+						},
+					},
+					Domains: []string{"test.darkroom.net"},
+				},
+			},
+			preReconcileRun: func(ctx context.Context, c client.Client, d *deploymentsv1alpha1.Darkroom) error {
+				return c.Create(context.Background(), d)
+			},
+			postReconcileRun: func(ctx context.Context, c client.Client, d *deploymentsv1alpha1.Darkroom) error {
+				desired := &deploymentsv1alpha1.Darkroom{}
+				if err := c.Get(ctx, client.ObjectKey{Name: d.Name, Namespace: d.Namespace}, desired); err != nil {
+					return err
+				}
+				s.Equal(d.Spec.Domains, desired.Status.Domains)
+				return nil
+			},
 		},
 	}
-	s.NoError(s.k8sClient.Create(context.Background(), darkroom))
 
-	s.Eventually(func() bool {
-		// TODO: Assert actual object states when logic is added to Reconcile loop.
-		return strings.Contains(s.buf.String(), "Successfully Reconciled\t{\"reconcilerGroup\":"+
-			" \"deployments.gojek.io\", \"reconcilerKind\": \"Darkroom\", \"controller\": \"darkroom\","+
-			" \"name\": \"darkroom-sample\", \"namespace\": \"default\"}")
-	}, 2*time.Second, 100*time.Millisecond)
+	for _, t := range testcases {
+		s.SetupTest()
+		s.Run(t.name, func() {
+			s.NoError(t.preReconcileRun(t.ctx, s.k8sClient, t.darkroom))
+
+			s.Eventually(func() bool {
+				err := t.postReconcileRun(t.ctx, s.k8sClient, t.darkroom)
+				s.NoError(err)
+				return err == nil
+			}, 2*time.Second, 100*time.Millisecond)
+		})
+	}
 }
 
 func (s *DarkroomControllerSuite) TearDownSuite() {
