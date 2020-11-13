@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	deploymentsv1alpha1 "github.com/gojekfarm/darkroom-operator/pkg/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+
+	deploymentsv1alpha1 "github.com/gojekfarm/darkroom-operator/pkg/api/v1alpha1"
 )
 
 func (r *DarkroomReconciler) desiredConfigMap(darkroom deploymentsv1alpha1.Darkroom) (corev1.ConfigMap, error) {
