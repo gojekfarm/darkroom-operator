@@ -31,6 +31,7 @@ import (
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -131,7 +132,7 @@ func (s *DarkroomControllerSuite) TestReconcile() {
 				},
 			},
 			preReconcileRun: func(ctx context.Context, c client.Client, d *deploymentsv1alpha1.Darkroom) error {
-				return c.Create(context.Background(), d)
+				return c.Create(ctx, d)
 			},
 			postReconcileRun: func(ctx context.Context, c client.Client, d *deploymentsv1alpha1.Darkroom) error {
 				desired := &deploymentsv1alpha1.Darkroom{}
@@ -171,6 +172,51 @@ func (s *DarkroomControllerSuite) TestReconcile() {
 				desired := &deploymentsv1alpha1.Darkroom{}
 				err := c.Get(ctx, client.ObjectKey{Name: d.Name, Namespace: d.Namespace}, desired)
 				s.Error(err)
+				return nil
+			},
+		},
+		{
+			name: "Reconciler creates the required ConfigMap",
+			ctx:  context.Background(),
+			darkroom: &deploymentsv1alpha1.Darkroom{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "darkroom-config",
+					Namespace: "default",
+				},
+				Spec: deploymentsv1alpha1.DarkroomSpec{
+					Source: deploymentsv1alpha1.Source{
+						Type: deploymentsv1alpha1.WebFolder,
+						WebFolderMeta: deploymentsv1alpha1.WebFolderMeta{
+							BaseURL: "https://example.com/assets/images",
+						},
+					},
+					Domains: []string{"config.darkroom.net"},
+				},
+			},
+			preReconcileRun: func(ctx context.Context, c client.Client, d *deploymentsv1alpha1.Darkroom) error {
+				return c.Create(ctx, d)
+			},
+			postReconcileRun: func(ctx context.Context, c client.Client, d *deploymentsv1alpha1.Darkroom) error {
+				cfgMap := &corev1.ConfigMap{}
+				desiredMap := map[string]string{
+					"CACHE_TIME":                            "31536000",
+					"DEBUG":                                 "false",
+					"LOG_LEVEL":                             "info",
+					"PORT":                                  "3000",
+					"SOURCE_BASEURL":                        "https://example.com/assets/images",
+					"SOURCE_HYSTRIX_COMMANDNAME":            "WEBFOLDER_ADAPTER",
+					"SOURCE_HYSTRIX_ERRORPERCENTTHRESHOLD":  "25",
+					"SOURCE_HYSTRIX_MAXCONCURRENTREQUESTS":  "100",
+					"SOURCE_HYSTRIX_REQUESTVOLUMETHRESHOLD": "10",
+					"SOURCE_HYSTRIX_SLEEPWINDOW":            "10",
+					"SOURCE_HYSTRIX_TIMEOUT":                "5000",
+					"SOURCE_KIND":                           "WebFolder",
+				}
+				err := c.Get(ctx, client.ObjectKey{Name: d.Name, Namespace: d.Namespace}, cfgMap)
+				s.NoError(err)
+				s.Equal(desiredMap, cfgMap.Data)
+				s.True(len(cfgMap.OwnerReferences) > 0)
+				s.Equal(deploymentsv1alpha1.GroupVersion.String(), cfgMap.OwnerReferences[0].APIVersion)
 				return nil
 			},
 		},

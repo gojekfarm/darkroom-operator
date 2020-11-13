@@ -54,6 +54,12 @@ func (r *DarkroomReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	cfg, _ := r.desiredConfigMap(darkroom)
+
+	applyOptions := []client.PatchOption{client.ForceOwnership, client.FieldOwner("darkroom-controller")}
+
+	_ = r.Patch(ctx, &cfg, client.Apply, applyOptions...)
+
 	darkroom.Status.Domains = darkroom.Spec.Domains
 	_ = r.Status().Update(ctx, &darkroom)
 	return ctrl.Result{}, nil
