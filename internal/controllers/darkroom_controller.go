@@ -50,7 +50,9 @@ func (r *DarkroomReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_ = r.Log.WithValues("darkroom", req.NamespacedName)
 	var darkroom deploymentsv1alpha1.Darkroom
 
-	_ = r.Get(ctx, req.NamespacedName, &darkroom)
+	if err := r.Get(ctx, req.NamespacedName, &darkroom); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
 
 	darkroom.Status.Domains = darkroom.Spec.Domains
 	_ = r.Status().Update(ctx, &darkroom)

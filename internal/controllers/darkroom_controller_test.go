@@ -142,6 +142,38 @@ func (s *DarkroomControllerSuite) TestReconcile() {
 				return nil
 			},
 		},
+		{
+			name: "Darkroom object is not found",
+			ctx:  context.Background(),
+			darkroom: &deploymentsv1alpha1.Darkroom{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "darkroom-missing",
+					Namespace: "default",
+				},
+				Spec: deploymentsv1alpha1.DarkroomSpec{
+					Source: deploymentsv1alpha1.Source{
+						Type: deploymentsv1alpha1.WebFolder,
+						WebFolderMeta: deploymentsv1alpha1.WebFolderMeta{
+							BaseURL: "https://example.com/assets/images",
+						},
+					},
+					Domains: []string{"missing.darkroom.net"},
+				},
+			},
+			preReconcileRun: func(ctx context.Context, c client.Client, d *deploymentsv1alpha1.Darkroom) error {
+				if err := c.Create(ctx, d); err != nil {
+					return err
+				}
+				// Delete as soon as created, but the Reconcile should be triggered
+				return c.Delete(ctx, d)
+			},
+			postReconcileRun: func(ctx context.Context, c client.Client, d *deploymentsv1alpha1.Darkroom) error {
+				desired := &deploymentsv1alpha1.Darkroom{}
+				err := c.Get(ctx, client.ObjectKey{Name: d.Name, Namespace: d.Namespace}, desired)
+				s.Error(err)
+				return nil
+			},
+		},
 	}
 
 	for _, t := range testcases {
