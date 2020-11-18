@@ -48,21 +48,33 @@ type DarkroomReconciler struct {
 
 func (r *DarkroomReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	_ = r.Log.WithValues("darkroom", req.NamespacedName)
+	l := r.Log.WithValues("darkroom", req.NamespacedName)
 	var darkroom deploymentsv1alpha1.Darkroom
 
 	if err := r.Get(ctx, req.NamespacedName, &darkroom); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	cfg, _ := r.desiredConfigMap(darkroom)
+	cfg, err := r.desiredConfigMap(darkroom)
+	if err != nil {
+		l.Error(err, "cfg err")
+		return ctrl.Result{}, err
+	}
 
 	applyOptions := []client.PatchOption{client.ForceOwnership, client.FieldOwner("darkroom-controller")}
 
-	_ = r.Patch(ctx, &cfg, client.Apply, applyOptions...)
+	if err := r.Patch(ctx, &cfg, client.Apply, applyOptions...); err != nil {
+		l.Error(err, "patch err")
+		return ctrl.Result{}, err
+	}
+	l.Info("patched cgfMap")
 
 	darkroom.Status.Domains = darkroom.Spec.Domains
-	_ = r.Status().Update(ctx, &darkroom)
+	if err := r.Status().Update(ctx, &darkroom); err != nil {
+		l.Error(err, "status err")
+		return ctrl.Result{}, err
+	}
+	l.Info("updated status object")
 	return ctrl.Result{}, nil
 }
 

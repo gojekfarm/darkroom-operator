@@ -27,6 +27,7 @@ package controllers
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
@@ -64,7 +65,9 @@ func TestDarkroomControllerSuite(t *testing.T) {
 
 func (s *DarkroomControllerSuite) SetupSuite() {
 	s.buf = &bytes.Buffer{}
-	logf.SetLogger(zap.New(zap.UseDevMode(true), zap.WriteTo(s.buf)))
+	l := zap.New(zap.UseDevMode(true), zap.WriteTo(s.buf))
+	logf.SetLogger(l)
+
 	s.testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{filepath.Join("..", "..", "config", "crd", "bases")},
 	}
@@ -91,7 +94,7 @@ func (s *DarkroomControllerSuite) SetupSuite() {
 
 	s.reconciler = &DarkroomReconciler{
 		Client: s.k8sClient,
-		Log:    ctrl.Log.WithName("controllers").WithName("Darkroom"),
+		Log:    l.WithName("controllers").WithName("Darkroom"),
 		Scheme: scheme.Scheme,
 	}
 
@@ -102,7 +105,7 @@ func (s *DarkroomControllerSuite) SetupSuite() {
 }
 
 func (s *DarkroomControllerSuite) SetupTest() {
-	s.buf.Reset()
+	//s.buf.Reset()
 }
 
 func (s *DarkroomControllerSuite) TestReconcile() {
@@ -230,8 +233,9 @@ func (s *DarkroomControllerSuite) TestReconcile() {
 			s.Eventually(func() bool {
 				err := t.postReconcileRun(t.ctx, s.k8sClient, t.darkroom)
 				s.NoError(err)
+				fmt.Printf("============= logs: \n%s\n\n", s.buf.String())
 				return err == nil
-			}, 2*time.Second, 100*time.Millisecond)
+			}, 5*time.Second, 100*time.Millisecond)
 		})
 	}
 }
