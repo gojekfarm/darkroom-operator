@@ -36,6 +36,6 @@ func (r *DarkroomReconciler) desiredConfigMap(darkroom deploymentsv1alpha1.Darkr
 		},
 	}
 
-	_ = ctrl.SetControllerReference(&darkroom, &cfg, r.Scheme)
-	return cfg, nil
+	err := ctrl.SetControllerReference(&darkroom, &cfg, r.Scheme)
+	return cfg, err
 }

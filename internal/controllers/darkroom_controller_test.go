@@ -33,6 +33,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/stretchr/testify/suite"
@@ -64,7 +65,9 @@ func TestDarkroomControllerSuite(t *testing.T) {
 
 func (s *DarkroomControllerSuite) SetupSuite() {
 	s.buf = &bytes.Buffer{}
-	logf.SetLogger(zap.New(zap.UseDevMode(true), zap.WriteTo(s.buf)))
+	l := zap.New(zap.UseDevMode(true), zap.WriteTo(s.buf))
+	logf.SetLogger(l)
+
 	s.testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{filepath.Join("..", "..", "config", "crd", "bases")},
 	}
@@ -91,7 +94,7 @@ func (s *DarkroomControllerSuite) SetupSuite() {
 
 	s.reconciler = &DarkroomReconciler{
 		Client: s.k8sClient,
-		Log:    ctrl.Log.WithName("controllers").WithName("Darkroom"),
+		Log:    l.WithName("controllers").WithName("Darkroom"),
 		Scheme: scheme.Scheme,
 	}
 
@@ -99,6 +102,9 @@ func (s *DarkroomControllerSuite) SetupSuite() {
 	go func() {
 		s.NoError(s.mgr.Start(s.stopCh))
 	}()
+
+	// wait for controller watchers to start
+	time.Sleep(5 * time.Second)
 }
 
 func (s *DarkroomControllerSuite) SetupTest() {
@@ -151,22 +157,18 @@ func (s *DarkroomControllerSuite) TestReconcile() {
 					Name:      "darkroom-missing",
 					Namespace: "default",
 				},
-				Spec: deploymentsv1alpha1.DarkroomSpec{
-					Source: deploymentsv1alpha1.Source{
-						Type: deploymentsv1alpha1.WebFolder,
-						WebFolderMeta: deploymentsv1alpha1.WebFolderMeta{
-							BaseURL: "https://example.com/assets/images",
-						},
-					},
-					Domains: []string{"missing.darkroom.net"},
-				},
 			},
 			preReconcileRun: func(ctx context.Context, c client.Client, d *deploymentsv1alpha1.Darkroom) error {
-				if err := c.Create(ctx, d); err != nil {
-					return err
-				}
-				// Delete as soon as created, but the Reconcile should be triggered
-				return c.Delete(ctx, d)
+				// hack to run reconcile func and check if err is nil
+				_, err := s.reconciler.Reconcile(ctrl.Request{
+					NamespacedName: types.NamespacedName{
+						Namespace: d.Namespace,
+						Name:      d.Name,
+					},
+				})
+				// should return nil if error was created with NewNotFound
+				s.NoError(err)
+				return nil
 			},
 			postReconcileRun: func(ctx context.Context, c client.Client, d *deploymentsv1alpha1.Darkroom) error {
 				desired := &deploymentsv1alpha1.Darkroom{}
