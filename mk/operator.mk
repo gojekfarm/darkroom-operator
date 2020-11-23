@@ -1,8 +1,26 @@
 CONTROLLER_EXECUTABLE="$(BUILD_DIR)/controller"
 
-IMG ?= darkroom-controller:latest
+ifneq ($(BUILD_INFO_VERSION), unknown)
+	CONTROLLER_VERSION ?= $(BUILD_INFO_VERSION)
+    VERSION := $(CONTROLLER_VERSION)
+else
+	CONTROLLER_VERSION ?= 0.0.1
+	VERSION := $(CONTROLLER_VERSION)
+endif
+
+BUNDLE_IMG ?= controller-bundle:$(CONTROLLER_VERSION)
+IMG ?= darkroom-controller:$(CONTROLLER_VERSION)
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true"
+
+# Options for 'bundle-build'
+ifneq ($(origin CHANNELS), undefined)
+BUNDLE_CHANNELS := --channels=$(CHANNELS)
+endif
+ifneq ($(origin DEFAULT_CHANNEL), undefined)
+BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
+endif
+BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
 ENVTEST_ASSETS_DIR = $(shell pwd)/testbin
 operator/manager/test: operator/generate fmt vet manifests ## Run manager tests
@@ -28,6 +46,17 @@ operator/docker-build: test ## Build the docker image
 
 operator/docker-push: ## Push the docker image
 	docker push ${IMG}
+
+.PHONY: bundle
+bundle: operator/manifests ## Generate bundle manifests and metadata, then validate generated files
+	operator-sdk generate kustomize manifests -q
+	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
+	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle -q --overwrite --version $(CONTROLLER_VERSION) $(BUNDLE_METADATA_OPTS)
+	operator-sdk bundle validate ./bundle
+
+.PHONY: bundle-build
+bundle-build: ## Build the bundle image
+	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 # find or download controller-gen
 # download controller-gen if necessary

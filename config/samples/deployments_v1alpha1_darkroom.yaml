@@ -3,5 +3,8 @@ kind: Darkroom
 metadata:
   name: darkroom-sample
 spec:
-  # Add fields here
-  foo: bar
+  source:
+    type: WebFolder
+    baseUrl: https://example.com/assets
+  domains:
+    - darkroom.example.com

@@ -1,0 +1,2 @@
+resources:
+- ./deployments_v1alpha1_darkroom.yaml
