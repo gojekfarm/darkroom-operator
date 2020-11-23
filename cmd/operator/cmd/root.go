@@ -49,14 +49,18 @@ func newRootCmd(opts rootCmdOpts) *cobra.Command {
 				return err
 			}
 
-			if err = (&controllers.DarkroomReconciler{
+			r := &controllers.DarkroomReconciler{
 				Client: mgr.GetClient(),
 				Log:    ctrl.Log.WithName("controllers").WithName("Darkroom"),
 				Scheme: mgr.GetScheme(),
-			}).SetupWithManager(mgr); err != nil {
+			}
+
+			if err = r.SetupControllerWithManager(mgr); err != nil {
 				setupLog.Error(err, "unable to create controller", "controller", "Darkroom")
 				return err
 			}
+			_ = r.SetupWebhookWithManager(mgr)
+
 			// +kubebuilder:scaffold:builder
 
 			setupLog.Info("starting manager")

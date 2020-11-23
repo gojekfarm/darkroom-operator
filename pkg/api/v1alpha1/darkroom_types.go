@@ -26,13 +26,18 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 // +kubebuilder:validation:Enum=WebFolder
 type Type string
 
+type DeployState string
+
 const (
 	WebFolder Type = "WebFolder"
+
+	Deploying DeployState = "Deploying"
 )
 
 type WebFolderMeta struct {
@@ -63,6 +68,7 @@ type DarkroomSpec struct {
 
 // DarkroomStatus defines the observed state of Darkroom
 type DarkroomStatus struct {
+	DeployState DeployState `json:"deployState"`
 	// +optional
 	Domains []string `json:"domains,omitempty"`
 }
@@ -79,6 +85,14 @@ type Darkroom struct {
 	Status DarkroomStatus `json:"status,omitempty"`
 }
 
+func (d *Darkroom) Default() {
+	log.Info("default", "name", d.Name)
+
+	if d.Spec.Version == "" {
+		d.Spec.Version = "latest"
+	}
+}
+
 // +kubebuilder:object:root=true
 
 // DarkroomList contains a list of Darkroom
@@ -87,6 +101,10 @@ type DarkroomList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Darkroom `json:"items"`
 }
+
+// +kubebuilder:webhook:path=/mutate-deployments-gojek-io-v1alpha1-darkroom,mutating=true,failurePolicy=fail,groups=deployments.gojek.io,resources=darkrooms,verbs=create;update,versions=v1alpha1,name=mdarkroom.gojek.io
+
+var _ webhook.Defaulter = &Darkroom{}
 
 func init() {
 	SchemeBuilder.Register(&Darkroom{}, &DarkroomList{})

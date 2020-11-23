@@ -255,7 +255,7 @@ func (m *mockManager) GetAPIReader() client.Reader {
 }
 
 func (m *mockManager) GetWebhookServer() *webhook.Server {
-	return m.Called().Get(0).(*webhook.Server)
+	return &webhook.Server{}
 }
 
 func (m *mockManager) GetLogger() logr.Logger {

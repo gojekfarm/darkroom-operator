@@ -28,6 +28,7 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -56,19 +57,29 @@ func (r *DarkroomReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	cfg, _ := r.desiredConfigMap(darkroom)
+	depl, _ := r.desiredDeployment(darkroom, cfg)
 
 	applyOptions := []client.PatchOption{client.ForceOwnership, client.FieldOwner("darkroom-controller")}
 
 	_ = r.Patch(ctx, &cfg, client.Apply, applyOptions...)
+	_ = r.Patch(ctx, &depl, client.Apply, applyOptions...)
 
 	darkroom.Status.Domains = darkroom.Spec.Domains
+	darkroom.Status.DeployState = deploymentsv1alpha1.Deploying
 	_ = r.Status().Update(ctx, &darkroom)
 	return ctrl.Result{}, nil
 }
 
-func (r *DarkroomReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *DarkroomReconciler) SetupControllerWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&deploymentsv1alpha1.Darkroom{}).
 		Owns(&corev1.ConfigMap{}).
+		Owns(&appsv1.Deployment{}).
 		Complete(r)
+}
+
+func (r *DarkroomReconciler) SetupWebhookWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewWebhookManagedBy(mgr).
+		For(&deploymentsv1alpha1.Darkroom{}).
+		Complete()
 }
