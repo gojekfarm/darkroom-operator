@@ -9,14 +9,17 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"github.com/gojekfarm/darkroom-operator/cmd/version"
+
 	"github.com/gojekfarm/darkroom-operator/internal/controllers"
 	deploymentsv1alpha1 "github.com/gojekfarm/darkroom-operator/pkg/api/v1alpha1"
+	pkglog "github.com/gojekfarm/darkroom-operator/pkg/log"
 	// +kubebuilder:scaffold:imports
 )
 
 var (
 	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	setupLog = pkglog.Log.WithName("operator").WithName("setup")
 )
 
 func init() {
@@ -84,9 +87,11 @@ type rootCmdOpts struct {
 }
 
 func NewRootCmd() *cobra.Command {
-	return newRootCmd(rootCmdOpts{
+	cmd := newRootCmd(rootCmdOpts{
 		SetupSignalHandler: ctrl.SetupSignalHandler,
 		NewManager:         ctrl.NewManager,
 		GetConfigOrDie:     ctrl.GetConfigOrDie,
 	})
+	cmd.AddCommand(version.New())
+	return cmd
 }

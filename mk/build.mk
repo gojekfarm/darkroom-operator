@@ -20,7 +20,7 @@ GO_RUN := GOOS=${GOOS} GOARCH=${GOARCH} CGO_ENABLED=0 go run $(LD_FLAGS)
 GOFLAGS :=
 
 .PHONY: build
-build: operator/manager/build ## Dev: Build all binaries
+build: builddir fmt vet operator/manager/build apiserver/build ## Dev: Build all binaries
 
 .PHONY: generate
 generate: operator/generate operator/manifests ## Dev: Generate required code and manifests
@@ -32,6 +32,8 @@ clean: clean/build ## Dev: Clean
 clean/build: ## Dev: Remove .out/ dir
 	@rm -rf $(BUILD_DIR)
 
+builddir:
+	@mkdir -p $(BUILD_DIR)
 
 KUBEBUILDER := $(shell command -v /usr/local/kubebuilder/bin/kubebuilder 2> /dev/null)
 
