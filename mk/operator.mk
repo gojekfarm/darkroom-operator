@@ -35,6 +35,16 @@ operator/manager/build: operator/generate fmt vet ## Build manager binary
 operator/manager/run: operator/generate fmt vet operator/manifests ## Run manager against the configured Kubernetes cluster in ~/.kube/config
 	@$(GO_RUN) cmd/operator/main.go
 
+operator/install: operator/manifests kustomize ## Install CRDs into a cluster
+	@$(KUSTOMIZE) build config/crd | kubectl apply -f -
+
+operator/uninstall: operator/manifests kustomize ## Uninstall CRDs from a cluster
+	@$(KUSTOMIZE) build config/crd | kubectl delete -f -
+
+operator/deploy: operator/manifests kustomize ## Deploy controller in the configured Kubernetes cluster in ~/.kube/config
+	@cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+	@$(KUSTOMIZE) build config/default | kubectl apply -f -
+
 operator/manifests: controller-gen ## Generate manifests e.g. CRD, RBAC etc.
 	@$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
@@ -42,21 +52,24 @@ operator/generate: controller-gen ## Generate operator code
 	@$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 operator/docker-build: test ## Build the docker image
-	docker build -f build/package/operator.Dockerfile -t ${IMG} .
+	@docker build -f build/package/operator.Dockerfile -t ${IMG} .
 
 operator/docker-push: ## Push the docker image
-	docker push ${IMG}
+	@docker push ${IMG}
 
 .PHONY: bundle
 bundle: operator/manifests ## Generate bundle manifests and metadata, then validate generated files
-	operator-sdk generate kustomize manifests -q
-	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle -q --overwrite --version $(CONTROLLER_VERSION) $(BUNDLE_METADATA_OPTS)
-	operator-sdk bundle validate ./bundle
+	@operator-sdk generate kustomize manifests -q
+	@cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
+	@$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle -q --overwrite --version $(CONTROLLER_VERSION) $(BUNDLE_METADATA_OPTS)
+	@operator-sdk bundle validate ./bundle
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image
-	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+	@docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+
+.PHONY: install
+install: operator/install ## Install all requites to the cluster
 
 # find or download controller-gen
 # download controller-gen if necessary
