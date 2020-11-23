@@ -1,0 +1,10 @@
+apiVersion: deployments.gojek.io/v1alpha1
+kind: Darkroom
+metadata:
+  name: darkroom-sample
+spec:
+  source:
+    type: WebFolder
+    baseUrl: https://example.com/assets
+  domains:
+    - darkroom.example.com

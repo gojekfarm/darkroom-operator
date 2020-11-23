@@ -2,9 +2,10 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"net/http"
-	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
@@ -47,12 +49,26 @@ func (s *RootCmdSuite) TestNewRootCmd() {
 
 func (s *RootCmdSuite) TestControllerStartup() {
 	errCh := make(chan error)
+	defer close(errCh)
+	var wg sync.WaitGroup
+	wg.Add(1)
 
 	mm := &mockManager{}
+	mc := &mockClient{}
+
 	mm.On("Start", mock.AnythingOfType("<-chan struct {}")).Return(nil)
+	mm.On("GetClient").Return(mc)
+	mm.On("GetScheme").Return(scheme)
+	mm.On("GetConfig").Return(&rest.Config{})
+	mm.On("GetLogger").Return(zap.New(zap.UseDevMode(true)))
+	mm.On("SetFields", mock.Anything).Return(nil)
+	mm.On("Add", mock.AnythingOfType("*controller.Controller")).Return(nil)
 
 	s.rootCmd = newRootCmd(rootCmdOpts{
 		SetupSignalHandler: func() <-chan struct{} {
+			time.AfterFunc(2*time.Second, func() {
+				wg.Done()
+			})
 			return s.stopCh
 		},
 		NewManager: func(config *rest.Config, options ctrl.Options) (ctrl.Manager, error) {
@@ -62,17 +78,14 @@ func (s *RootCmdSuite) TestControllerStartup() {
 			return nil
 		},
 	})
+	s.rootCmd.SetArgs([]string{})
 	s.rootCmd.SetOut(s.buf)
 
 	go func() {
-		defer close(errCh)
 		errCh <- s.rootCmd.Execute()
 	}()
 
-	s.True(s.Eventually(func() bool {
-		return strings.Contains(s.buf.String(), "starting manager")
-	}, 5*time.Second, 100*time.Millisecond), "failed to start controller")
-
+	wg.Wait()
 	close(s.stopCh)
 	s.NoError(<-errCh)
 }
@@ -108,7 +121,15 @@ func (s *RootCmdSuite) TestControllerStartupWithManagerStartError() {
 	startErr := errors.New("unable to start manager")
 
 	mm := &mockManager{}
+	mc := &mockClient{}
+
 	mm.On("Start", mock.AnythingOfType("<-chan struct {}")).Return(startErr)
+	mm.On("GetClient").Return(mc)
+	mm.On("GetScheme").Return(scheme)
+	mm.On("GetConfig").Return(&rest.Config{})
+	mm.On("GetLogger").Return(zap.New(zap.UseDevMode(true)))
+	mm.On("SetFields", mock.Anything).Return(nil)
+	mm.On("Add", mock.AnythingOfType("*controller.Controller")).Return(nil)
 
 	s.rootCmd = newRootCmd(rootCmdOpts{
 		SetupSignalHandler: func() <-chan struct{} {
@@ -130,6 +151,43 @@ func (s *RootCmdSuite) TestControllerStartupWithManagerStartError() {
 
 	close(s.stopCh)
 	s.EqualError(<-errCh, startErr.Error())
+}
+
+func (s *RootCmdSuite) TestControllerSetupError() {
+	errCh := make(chan error)
+	controllerAddErr := errors.New("can't add controller")
+
+	mm := &mockManager{}
+	mc := &mockClient{}
+
+	mm.On("Start", mock.AnythingOfType("<-chan struct {}")).Return(nil)
+	mm.On("GetClient").Return(mc)
+	mm.On("GetScheme").Return(scheme)
+	mm.On("GetConfig").Return(&rest.Config{})
+	mm.On("GetLogger").Return(zap.New(zap.UseDevMode(true)))
+	mm.On("SetFields", mock.Anything).Return(nil)
+	mm.On("Add", mock.AnythingOfType("*controller.Controller")).Return(controllerAddErr)
+
+	s.rootCmd = newRootCmd(rootCmdOpts{
+		SetupSignalHandler: func() <-chan struct{} {
+			return s.stopCh
+		},
+		NewManager: func(config *rest.Config, options ctrl.Options) (ctrl.Manager, error) {
+			return mm, nil
+		},
+		GetConfigOrDie: func() *rest.Config {
+			return nil
+		},
+	})
+	s.rootCmd.SetOut(s.buf)
+
+	go func() {
+		defer close(errCh)
+		errCh <- s.rootCmd.Execute()
+	}()
+
+	close(s.stopCh)
+	s.EqualError(<-errCh, controllerAddErr.Error())
 }
 
 type mockManager struct {
@@ -197,9 +255,45 @@ func (m *mockManager) GetAPIReader() client.Reader {
 }
 
 func (m *mockManager) GetWebhookServer() *webhook.Server {
-	return m.Called().Get(0).(*webhook.Server)
+	return &webhook.Server{}
 }
 
 func (m *mockManager) GetLogger() logr.Logger {
 	return m.Called().Get(0).(logr.Logger)
+}
+
+type mockClient struct {
+	mock.Mock
+}
+
+func (m *mockClient) Get(ctx context.Context, key client.ObjectKey, obj runtime.Object) error {
+	return m.Called(ctx, key, obj).Error(0)
+}
+
+func (m *mockClient) List(ctx context.Context, list runtime.Object, opts ...client.ListOption) error {
+	return m.Called(ctx, list, opts).Error(0)
+}
+
+func (m *mockClient) Create(ctx context.Context, obj runtime.Object, opts ...client.CreateOption) error {
+	return m.Called(ctx, obj, opts).Error(0)
+}
+
+func (m *mockClient) Delete(ctx context.Context, obj runtime.Object, opts ...client.DeleteOption) error {
+	return m.Called(ctx, obj, opts).Error(0)
+}
+
+func (m *mockClient) Update(ctx context.Context, obj runtime.Object, opts ...client.UpdateOption) error {
+	return m.Called(ctx, obj, opts).Error(0)
+}
+
+func (m *mockClient) Patch(ctx context.Context, obj runtime.Object, patch client.Patch, opts ...client.PatchOption) error {
+	return m.Called(ctx, obj, patch, opts).Error(0)
+}
+
+func (m *mockClient) DeleteAllOf(ctx context.Context, obj runtime.Object, opts ...client.DeleteAllOfOption) error {
+	return m.Called(ctx, obj, opts).Error(0)
+}
+
+func (m *mockClient) Status() client.StatusWriter {
+	return m.Called().Get(0).(client.StatusWriter)
 }
