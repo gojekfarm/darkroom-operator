@@ -9,6 +9,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+
+	endpointRest "github.com/gojekfarm/darkroom-operator/internal/api-server/rest"
 )
 
 var (
@@ -36,7 +38,7 @@ type Manager interface {
 
 type manager struct {
 	config          *rest.Config
-	client          client.Client
+	em              endpointRest.EndpointManager
 	started         bool
 	internalStop    <-chan struct{}
 	internalStopper chan<- struct{}
@@ -68,18 +70,20 @@ func NewManager(newOpts NewManagerFuncOptions) NewManagerFunc {
 			return nil, err
 		}
 
+		em := endpointRest.NewEndpointManager(&client.DelegatingClient{
+			Reader: &client.DelegatingReader{
+				CacheReader:  cc,
+				ClientReader: c,
+			},
+			Writer:       c,
+			StatusClient: c,
+		})
+
 		stop := make(chan struct{})
 		return &manager{
-			config: config,
-			cache:  cc,
-			client: &client.DelegatingClient{
-				Reader: &client.DelegatingReader{
-					CacheReader:  cc,
-					ClientReader: c,
-				},
-				Writer:       c,
-				StatusClient: c,
-			},
+			config:          config,
+			cache:           cc,
+			em:              em,
 			internalStop:    stop,
 			internalStopper: stop,
 			errChan:         make(chan error),
@@ -93,7 +97,7 @@ func (m *manager) Start(stop <-chan struct{}) error {
 	defer close(m.internalStopper)
 	m.waitForCache()
 
-	srv := newApiServer(m.port, m.allowedDomains, m.client)
+	srv := newApiServer(m.port, m.allowedDomains, m.em)
 
 	go func() {
 		if err := srv.Start(m.internalStop); err != nil {

@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/emicklei/go-restful"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/gojekfarm/darkroom-operator/internal/api-server/rest"
 	pkglog "github.com/gojekfarm/darkroom-operator/pkg/log"
 )
 
@@ -22,31 +22,24 @@ func (as *apiServer) Address() string {
 	return as.server.Addr
 }
 
-func newApiServer(port int, allowedDomains []string, _ client.Client) *apiServer {
+func newApiServer(port int, allowedDomains []string, em rest.EndpointManager) *apiServer {
 	container := restful.NewContainer()
 	container.Handle("/healthz", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("ok"))
 	}))
-
-	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
-		Handler: container.ServeMux,
-	}
+	em.Setup(container)
 
 	cors := restful.CrossOriginResourceSharing{
 		ExposeHeaders:  []string{restful.HEADER_AccessControlAllowOrigin},
 		AllowedDomains: allowedDomains,
 		Container:      container,
 	}
-
-	ws := new(restful.WebService)
-	ws.
-		Path("/").
-		Consumes(restful.MIME_JSON).
-		Produces(restful.MIME_JSON)
-
-	container.Add(ws)
 	container.Filter(cors.Filter)
+
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: container.ServeMux,
+	}
 	return &apiServer{
 		server: srv,
 	}

@@ -7,14 +7,19 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+
+	"github.com/gojekfarm/darkroom-operator/internal/testhelper/mocks"
 )
 
 func TestRunServer(t *testing.T) {
 	errCh := make(chan error)
 	stopCh := make(chan struct{})
 	diagnosticsPort := 9999
+	em := &mocks.MockEndpointManager{}
+	em.On("Setup", mock.AnythingOfType("*restful.Container"))
 
-	srv := newApiServer(diagnosticsPort, []string{}, nil)
+	srv := newApiServer(diagnosticsPort, []string{}, em)
 
 	go func() {
 		defer close(errCh)
@@ -32,13 +37,16 @@ func TestRunServer(t *testing.T) {
 	close(stopCh)
 
 	assert.NoError(t, <-errCh)
+	em.AssertExpectations(t)
 }
 
 func TestRunServerWithInvalidPort(t *testing.T) {
 	errCh := make(chan error)
 	stopCh := make(chan struct{})
+	em := &mocks.MockEndpointManager{}
+	em.On("Setup", mock.AnythingOfType("*restful.Container"))
 
-	srv := newApiServer(-9999, []string{}, nil)
+	srv := newApiServer(-9999, []string{}, em)
 
 	go func() {
 		defer close(errCh)
@@ -46,4 +54,5 @@ func TestRunServerWithInvalidPort(t *testing.T) {
 	}()
 
 	assert.Error(t, <-errCh)
+	em.AssertExpectations(t)
 }

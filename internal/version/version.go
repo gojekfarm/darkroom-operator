@@ -1,5 +1,9 @@
 package version
 
+const (
+	Product = "Darkroom"
+)
+
 var (
 	version   = "unknown"
 	gitTag    = "unknown"
