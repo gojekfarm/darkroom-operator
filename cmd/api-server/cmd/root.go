@@ -7,6 +7,10 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/gojekfarm/darkroom-operator/cmd/version"
 	apiserver "github.com/gojekfarm/darkroom-operator/internal/api-server"
@@ -32,6 +36,8 @@ func newRootCmd(opts rootCmdOpts) *cobra.Command {
 	}{}
 	cmd := &cobra.Command{
 		RunE: func(c *cobra.Command, _ []string) error {
+			pkglog.SetLogger(zap.New(zap.UseDevMode(true), zap.WriteTo(c.OutOrStderr())))
+
 			mgr, err := opts.NewManager(opts.GetConfigOrDie(), apiserver.Options{
 				Scheme: scheme,
 				Port:   args.port,
@@ -51,15 +57,19 @@ func newRootCmd(opts rootCmdOpts) *cobra.Command {
 
 type rootCmdOpts struct {
 	SetupSignalHandler func() (stopCh <-chan struct{})
-	NewManager         func(*rest.Config, apiserver.Options) (apiserver.Manager, error)
+	NewManager         apiserver.NewManagerFunc
 	GetConfigOrDie     func() *rest.Config
 }
 
 func NewRootCmd() *cobra.Command {
 	cmd := newRootCmd(rootCmdOpts{
 		SetupSignalHandler: ctrl.SetupSignalHandler,
-		NewManager:         apiserver.NewManager,
-		GetConfigOrDie:     ctrl.GetConfigOrDie,
+		NewManager: apiserver.NewManager(apiserver.NewManagerFuncOptions{
+			NewDynamicRESTMapper: apiutil.NewDynamicRESTMapper,
+			NewCache:             cache.New,
+			NewClient:            client.New,
+		}),
+		GetConfigOrDie: ctrl.GetConfigOrDie,
 	})
 	cmd.AddCommand(version.New())
 	return cmd

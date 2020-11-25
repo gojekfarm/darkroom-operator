@@ -10,7 +10,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/gojekfarm/darkroom-operator/cmd/version"
-
 	"github.com/gojekfarm/darkroom-operator/internal/controllers"
 	deploymentsv1alpha1 "github.com/gojekfarm/darkroom-operator/pkg/api/v1alpha1"
 	pkglog "github.com/gojekfarm/darkroom-operator/pkg/log"
@@ -38,7 +37,7 @@ func newRootCmd(opts rootCmdOpts) *cobra.Command {
 		Use:   "darkroom-operator",
 		Short: "Darkroom Operator helps deploy Darkroom in a Kubernetes Cluster",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			ctrl.SetLogger(zap.New(zap.UseDevMode(true), zap.WriteTo(cmd.OutOrStderr())))
+			pkglog.SetLogger(zap.New(zap.UseDevMode(true), zap.WriteTo(cmd.OutOrStderr())))
 
 			mgr, err := opts.NewManager(opts.GetConfigOrDie(), ctrl.Options{
 				Scheme:             scheme,
