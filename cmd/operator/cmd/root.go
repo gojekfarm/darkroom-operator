@@ -32,6 +32,7 @@ func newRootCmd(opts rootCmdOpts) *cobra.Command {
 	args := struct {
 		metricsAddr          string
 		enableLeaderElection bool
+		certDir              string
 	}{}
 	cmd := &cobra.Command{
 		Use:   "darkroom-operator",
@@ -45,6 +46,7 @@ func newRootCmd(opts rootCmdOpts) *cobra.Command {
 				Port:               9443,
 				LeaderElection:     args.enableLeaderElection,
 				LeaderElectionID:   "750f7516.gojek.io",
+				CertDir:            args.certDir,
 			})
 			if err != nil {
 				setupLog.Error(err, "unable to start manager")
@@ -74,6 +76,7 @@ func newRootCmd(opts rootCmdOpts) *cobra.Command {
 		},
 	}
 	cmd.PersistentFlags().StringVarP(&args.metricsAddr, "metrics-addr", "b", ":8080", "The address the metric endpoint binds to.")
+	cmd.PersistentFlags().StringVar(&args.certDir, "cert-dir", "", "The directory containing server certificate and key.")
 	cmd.PersistentFlags().BoolVar(&args.enableLeaderElection, "enable-leader-election", false, "Enable leader election for controller manager. "+
 		"Enabling this will ensure there is only one active controller manager.")
 	return cmd
