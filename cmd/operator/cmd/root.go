@@ -9,14 +9,16 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"github.com/gojekfarm/darkroom-operator/cmd/version"
 	"github.com/gojekfarm/darkroom-operator/internal/controllers"
 	deploymentsv1alpha1 "github.com/gojekfarm/darkroom-operator/pkg/api/v1alpha1"
+	pkglog "github.com/gojekfarm/darkroom-operator/pkg/log"
 	// +kubebuilder:scaffold:imports
 )
 
 var (
 	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	setupLog = pkglog.Log.WithName("operator").WithName("setup")
 )
 
 func init() {
@@ -30,12 +32,13 @@ func newRootCmd(opts rootCmdOpts) *cobra.Command {
 	args := struct {
 		metricsAddr          string
 		enableLeaderElection bool
+		certDir              string
 	}{}
 	cmd := &cobra.Command{
 		Use:   "darkroom-operator",
 		Short: "Darkroom Operator helps deploy Darkroom in a Kubernetes Cluster",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			ctrl.SetLogger(zap.New(zap.UseDevMode(true), zap.WriteTo(cmd.OutOrStderr())))
+			pkglog.SetLogger(zap.New(zap.UseDevMode(true), zap.WriteTo(cmd.OutOrStderr())))
 
 			mgr, err := opts.NewManager(opts.GetConfigOrDie(), ctrl.Options{
 				Scheme:             scheme,
@@ -43,6 +46,7 @@ func newRootCmd(opts rootCmdOpts) *cobra.Command {
 				Port:               9443,
 				LeaderElection:     args.enableLeaderElection,
 				LeaderElectionID:   "750f7516.gojek.io",
+				CertDir:            args.certDir,
 			})
 			if err != nil {
 				setupLog.Error(err, "unable to start manager")
@@ -72,6 +76,7 @@ func newRootCmd(opts rootCmdOpts) *cobra.Command {
 		},
 	}
 	cmd.PersistentFlags().StringVarP(&args.metricsAddr, "metrics-addr", "b", ":8080", "The address the metric endpoint binds to.")
+	cmd.PersistentFlags().StringVar(&args.certDir, "cert-dir", "", "The directory containing server certificate and key.")
 	cmd.PersistentFlags().BoolVar(&args.enableLeaderElection, "enable-leader-election", false, "Enable leader election for controller manager. "+
 		"Enabling this will ensure there is only one active controller manager.")
 	return cmd
@@ -84,9 +89,11 @@ type rootCmdOpts struct {
 }
 
 func NewRootCmd() *cobra.Command {
-	return newRootCmd(rootCmdOpts{
+	cmd := newRootCmd(rootCmdOpts{
 		SetupSignalHandler: ctrl.SetupSignalHandler,
 		NewManager:         ctrl.NewManager,
 		GetConfigOrDie:     ctrl.GetConfigOrDie,
 	})
+	cmd.AddCommand(version.New())
+	return cmd
 }

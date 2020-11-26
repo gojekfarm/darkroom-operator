@@ -11,7 +11,7 @@ endif
 BUNDLE_IMG ?= controller-bundle:$(CONTROLLER_VERSION)
 IMG ?= darkroom-controller:$(CONTROLLER_VERSION)
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
-CRD_OPTIONS ?= "crd:trivialVersions=true"
+CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
 
 # Options for 'bundle-build'
 ifneq ($(origin CHANNELS), undefined)
@@ -28,12 +28,8 @@ operator/manager/test: operator/generate fmt vet manifests ## Run manager tests
 	@test -f $(ENVTEST_ASSETS_DIR)/setup-envtest.sh || curl -sSLo $(ENVTEST_ASSETS_DIR)/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.6.3/hack/setup-envtest.sh
 	@source $(ENVTEST_ASSETS_DIR)/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR); go test ./... -coverprofile cover.out
 
-operator/manager/build: operator/generate fmt vet ## Build manager binary
-	@mkdir -p $(BUILD_DIR)
+operator/manager/build: operator/generate ## Build manager binary
 	@$(GO_BUILD) -o $(CONTROLLER_EXECUTABLE) cmd/operator/main.go
-
-operator/manager/run: operator/generate fmt vet operator/manifests ## Run manager against the configured Kubernetes cluster in ~/.kube/config
-	@$(GO_RUN) cmd/operator/main.go
 
 operator/install: operator/manifests kustomize ## Install CRDs into a cluster
 	@$(KUSTOMIZE) build config/crd | kubectl apply -f -

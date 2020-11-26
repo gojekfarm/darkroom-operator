@@ -1,4 +1,4 @@
-package cmd
+package version
 
 import (
 	"bytes"
@@ -34,7 +34,7 @@ func (s *VersionCmdSuite) SetupTest() {
 	s.rootCmd = &cobra.Command{
 		Use: "app",
 	}
-	s.rootCmd.AddCommand(newVersionCmd())
+	s.rootCmd.AddCommand(New())
 	s.buf = &bytes.Buffer{}
 	s.rootCmd.SetOut(s.buf)
 }

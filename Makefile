@@ -7,4 +7,6 @@ include mk/dev.mk
 include mk/build.mk
 include mk/check.mk
 include mk/operator.mk
+include mk/apiserver.mk
+include mk/run.mk
 include mk/test.mk

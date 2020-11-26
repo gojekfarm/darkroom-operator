@@ -1,4 +1,4 @@
-package cmd
+package version
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	"github.com/gojekfarm/darkroom-operator/internal/version"
 )
 
-func newVersionCmd() *cobra.Command {
+func New() *cobra.Command {
 	args := struct {
 		detailed bool
 	}{}
