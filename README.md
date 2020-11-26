@@ -48,6 +48,16 @@ The changes required in `main.go` are hence skipped and you must add the generat
 
 You can run `make operator/generate` to generate necessary code by the `controller-gen`. And run `make operator/manifests` to generate the required YAML definitions.
 
+##### Deploying Webhooks for development
+
+It is recommended to use a [Kind](https://kind.sigs.k8s.io/) cluster for faster iteration.
+
+Install `cert-manager` with
+```shell script
+kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.1.0/cert-manager.yaml
+```
+> Note: You may use the latest version
+
 ### Contributing Guide
 
 Read our [contributing guide](./CONTRIBUTING.md) to learn about our development process, how to propose bugfixes and improvements, and how to build and test your changes to Darkroom Operator.

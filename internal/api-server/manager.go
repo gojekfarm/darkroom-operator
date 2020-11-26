@@ -37,7 +37,6 @@ type Manager interface {
 }
 
 type manager struct {
-	config          *rest.Config
 	em              endpointRest.EndpointManager
 	started         bool
 	internalStop    <-chan struct{}
@@ -81,7 +80,6 @@ func NewManager(newOpts NewManagerFuncOptions) NewManagerFunc {
 
 		stop := make(chan struct{})
 		return &manager{
-			config:          config,
 			cache:           cc,
 			em:              em,
 			internalStop:    stop,

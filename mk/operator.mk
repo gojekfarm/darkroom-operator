@@ -11,7 +11,7 @@ endif
 BUNDLE_IMG ?= controller-bundle:$(CONTROLLER_VERSION)
 IMG ?= darkroom-controller:$(CONTROLLER_VERSION)
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
-CRD_OPTIONS ?= "crd:trivialVersions=true"
+CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
 
 # Options for 'bundle-build'
 ifneq ($(origin CHANNELS), undefined)

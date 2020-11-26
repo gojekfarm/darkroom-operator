@@ -25,9 +25,8 @@ SOFTWARE.
 package controllers
 
 import (
-	"bytes"
 	"context"
-	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -36,15 +35,9 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/gojekfarm/darkroom-operator/internal/testhelper"
 	deploymentsv1alpha1 "github.com/gojekfarm/darkroom-operator/pkg/api/v1alpha1"
@@ -53,12 +46,7 @@ import (
 
 type DarkroomControllerSuite struct {
 	suite.Suite
-	cfg        *rest.Config
-	k8sClient  client.Client
-	testEnv    *envtest.Environment
-	buf        *bytes.Buffer
-	stopCh     chan struct{}
-	mgr        ctrl.Manager
+	testEnv    testhelper.Environment
 	reconciler *DarkroomReconciler
 }
 
@@ -67,62 +55,21 @@ func TestDarkroomControllerSuite(t *testing.T) {
 }
 
 func (s *DarkroomControllerSuite) SetupSuite() {
-	s.buf = &bytes.Buffer{}
-	l := zap.New(zap.UseDevMode(true), zap.WriteTo(s.buf))
-	logf.SetLogger(l)
-	scheme := runtime.NewScheme()
-
-	s.testEnv = testhelper.NewTestEnvironment()
-	s.stopCh = make(chan struct{})
+	s.testEnv = testhelper.NewTestEnvironment([]string{filepath.Join("..", "..", "config", "crd", "bases")})
+	s.reconciler = &DarkroomReconciler{
+		Log:    s.testEnv.GetLogger().WithName("controllers").WithName("Darkroom"),
+		Scheme: testhelper.Scheme,
+	}
+	s.testEnv.Add(s.reconciler)
+	s.NoError(s.testEnv.Start())
 
 	var err error
-	s.cfg, err = s.testEnv.Start()
+	s.reconciler.Client, err = testhelper.NewClient(s.testEnv.GetConfig())
 	s.NoError(err)
-	s.NotNil(s.cfg)
-
-	err = clientgoscheme.AddToScheme(scheme)
-	s.NoError(err)
-	err = deploymentsv1alpha1.AddToScheme(scheme)
-	s.NoError(err)
-
-	// +kubebuilder:scaffold:scheme
-
-	s.k8sClient, err = client.New(s.cfg, client.Options{Scheme: scheme})
-	s.NoError(err)
-	s.NotNil(s.k8sClient)
-
-	s.mgr, err = ctrl.NewManager(s.cfg, ctrl.Options{
-		Scheme:  scheme,
-		CertDir: s.testEnv.WebhookInstallOptions.LocalServingCertDir,
-		Host:    s.testEnv.WebhookInstallOptions.LocalServingHost,
-		Port:    s.testEnv.WebhookInstallOptions.LocalServingPort,
-	})
-	s.NoError(err)
-
-	s.reconciler = &DarkroomReconciler{
-		Client: s.k8sClient,
-		Log:    l.WithName("controllers").WithName("Darkroom"),
-		Scheme: scheme,
-	}
-
-	s.NoError(s.reconciler.SetupControllerWithManager(s.mgr))
-	s.NoError(s.reconciler.SetupWebhookWithManager(s.mgr))
-
-	go func() {
-		s.NoError(s.mgr.Start(s.stopCh))
-	}()
-
-	// wait for controller workers to start
-	if !s.Eventually(func() bool {
-		return strings.Contains(s.buf.String(), "Starting workers")
-	}, 10*time.Second, 100*time.Millisecond) {
-		s.Fail("unable to start workers via controller manager")
-		os.Exit(1)
-	}
 }
 
 func (s *DarkroomControllerSuite) SetupTest() {
-	s.buf.Reset()
+	s.testEnv.ResetLogs()
 }
 
 func (s *DarkroomControllerSuite) TestReconcile() {
@@ -286,10 +233,10 @@ func (s *DarkroomControllerSuite) TestReconcile() {
 	for _, t := range testcases {
 		s.SetupTest()
 		s.Run(t.name, func() {
-			s.NoError(t.preReconcileRun(t.ctx, s.k8sClient, t.darkroom))
+			s.NoError(t.preReconcileRun(t.ctx, s.reconciler.Client, t.darkroom))
 
 			s.Eventually(func() bool {
-				err := t.postReconcileRun(t.ctx, s.k8sClient, t.darkroom)
+				err := t.postReconcileRun(t.ctx, s.reconciler.Client, t.darkroom)
 				s.NoError(err)
 				return err == nil
 			}, 2*time.Second, 100*time.Millisecond)
@@ -298,6 +245,5 @@ func (s *DarkroomControllerSuite) TestReconcile() {
 }
 
 func (s *DarkroomControllerSuite) TearDownSuite() {
-	close(s.stopCh)
 	s.NoError(s.testEnv.Stop())
 }

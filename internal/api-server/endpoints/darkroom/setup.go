@@ -10,6 +10,9 @@ type Endpoint struct {
 }
 
 func (e *Endpoint) SetupWithWS(ws *restful.WebService) {
+	ws.Route(ws.GET("darkrooms").To(e.list).
+		Doc("List of Darkrooms").
+		Returns(200, "OK", &List{}))
 }
 
 func NewEndpoint(client client.Client) *Endpoint {

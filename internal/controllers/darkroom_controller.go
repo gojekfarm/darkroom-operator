@@ -34,11 +34,15 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/gojekfarm/darkroom-operator/internal/controllers/setup"
+
 	deploymentsv1alpha1 "github.com/gojekfarm/darkroom-operator/pkg/api/v1alpha1"
 )
 
 // DarkroomReconciler reconciles a Darkroom object
 type DarkroomReconciler struct {
+	setup.Controller
+	setup.Webhook
 	client.Client
 	Log    logr.Logger
 	Scheme *runtime.Scheme
@@ -46,6 +50,8 @@ type DarkroomReconciler struct {
 
 // +kubebuilder:rbac:groups=deployments.gojek.io,resources=darkrooms,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=deployments.gojek.io,resources=darkrooms/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="apps",resources=deployments,verbs=get;list;watch;create;update;patch;delete
 
 func (r *DarkroomReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()

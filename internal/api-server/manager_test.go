@@ -2,6 +2,7 @@ package apiserver
 
 import (
 	"errors"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -12,15 +13,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache/informertest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
-	"sigs.k8s.io/controller-runtime/pkg/envtest"
 
+	"github.com/gojekfarm/darkroom-operator/internal/controllers"
 	"github.com/gojekfarm/darkroom-operator/internal/testhelper"
 )
 
 type ManagerSuite struct {
 	suite.Suite
-	testEnv *envtest.Environment
-	cfg     *rest.Config
+	testEnv testhelper.Environment
 }
 
 func TestManager(t *testing.T) {
@@ -28,12 +28,16 @@ func TestManager(t *testing.T) {
 }
 
 func (s *ManagerSuite) SetupSuite() {
-	s.testEnv = testhelper.NewTestEnvironment()
+	s.testEnv = testhelper.NewTestEnvironment([]string{filepath.Join("..", "..", "config", "crd", "bases")})
+	r := &controllers.DarkroomReconciler{
+		Log:    s.testEnv.GetLogger().WithName("controllers").WithName("Darkroom"),
+		Scheme: testhelper.Scheme,
+	}
+	s.testEnv.Add(r)
 
-	var err error
-	s.cfg, err = s.testEnv.Start()
-	s.NoError(err)
-	s.NotNil(s.cfg)
+	s.NoError(s.testEnv.Start())
+	c, _ := testhelper.NewClient(s.testEnv.GetConfig())
+	r.Client = c
 }
 
 func (s *ManagerSuite) TearDownSuite() {
@@ -127,7 +131,7 @@ func (s *ManagerSuite) TestStart() {
 				sp = *t.serverPort
 			}
 
-			m, err := mf(s.cfg, Options{
+			m, err := mf(s.testEnv.GetConfig(), Options{
 				Scheme:         runtime.NewScheme(),
 				Port:           sp,
 				AllowedDomains: []string{},
