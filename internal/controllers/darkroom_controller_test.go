@@ -36,6 +36,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -228,6 +229,54 @@ func (s *DarkroomControllerSuite) TestReconcile() {
 				return nil
 			},
 		},
+		{
+			name: "Reconciler creates the required Service",
+			ctx:  context.Background(),
+			darkroom: &deploymentsv1alpha1.Darkroom{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "darkroom-service",
+					Namespace: "default",
+				},
+				Spec: deploymentsv1alpha1.DarkroomSpec{
+					Source: deploymentsv1alpha1.Source{
+						Type: deploymentsv1alpha1.WebFolder,
+						WebFolderMeta: deploymentsv1alpha1.WebFolderMeta{
+							BaseURL: "https://example.com/assets/images",
+						},
+					},
+					Domains: []string{"service.darkroom.net"},
+				},
+			},
+			preReconcileRun: func(ctx context.Context, c client.Client, d *deploymentsv1alpha1.Darkroom) error {
+				return c.Create(ctx, d)
+			},
+			postReconcileRun: func(ctx context.Context, c client.Client, d *deploymentsv1alpha1.Darkroom) error {
+				svc := &corev1.Service{}
+				if err := c.Get(ctx, client.ObjectKey{Name: d.Name, Namespace: d.Namespace}, svc); err != nil {
+					return err
+				}
+				desired := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      d.Name,
+						Namespace: d.Namespace,
+					},
+					Spec: corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{
+							{Name: "http", Port: 8080, Protocol: "TCP", TargetPort: intstr.FromString("http")},
+						},
+						Selector: map[string]string{"darkroom": d.Name},
+						Type:     corev1.ServiceTypeClusterIP,
+					},
+				}
+				s.Equal(desired.ObjectMeta.Name, svc.ObjectMeta.Name)
+				s.Equal(desired.ObjectMeta.Namespace, svc.ObjectMeta.Namespace)
+				s.NotEqual("", svc.Spec.ClusterIP)
+				s.Equal(desired.Spec.Ports, svc.Spec.Ports)
+				s.Equal(desired.Spec.Selector, svc.Spec.Selector)
+				s.Equal(desired.Spec.Type, svc.Spec.Type)
+				return nil
+			},
+		},
 	}
 
 	for _, t := range testcases {
@@ -239,7 +288,7 @@ func (s *DarkroomControllerSuite) TestReconcile() {
 				err := t.postReconcileRun(t.ctx, s.reconciler.Client, t.darkroom)
 				s.NoError(err)
 				return err == nil
-			}, 2*time.Second, 100*time.Millisecond)
+			}, 10*time.Second, 250*time.Millisecond)
 		})
 	}
 }

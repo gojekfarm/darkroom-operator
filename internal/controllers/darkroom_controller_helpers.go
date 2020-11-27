@@ -7,6 +7,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	deploymentsv1alpha1 "github.com/gojekfarm/darkroom-operator/pkg/api/v1alpha1"
@@ -82,4 +83,24 @@ func (r *DarkroomReconciler) desiredDeployment(darkroom deploymentsv1alpha1.Dark
 
 	err := ctrl.SetControllerReference(&darkroom, &depl, r.Scheme)
 	return depl, err
+}
+
+func (r *DarkroomReconciler) desiredService(darkroom deploymentsv1alpha1.Darkroom) (corev1.Service, error) {
+	svc := corev1.Service{
+		TypeMeta: metav1.TypeMeta{APIVersion: corev1.SchemeGroupVersion.String(), Kind: "Service"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      darkroom.Name,
+			Namespace: darkroom.Namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{Name: "http", Port: 8080, Protocol: "TCP", TargetPort: intstr.FromString("http")},
+			},
+			Selector: map[string]string{"darkroom": darkroom.Name},
+			Type:     corev1.ServiceTypeClusterIP,
+		},
+	}
+
+	err := ctrl.SetControllerReference(&darkroom, &svc, r.Scheme)
+	return svc, err
 }
