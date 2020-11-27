@@ -74,13 +74,12 @@ func (s *EndpointSuite) TestList() {
 	}
 	s.NoError(s.ep.client.Create(ctx, d))
 
-	req := httptest.NewRequest(http.MethodGet, "/darkrooms", nil)
-	resp := httptest.NewRecorder()
-
-	// TODO: Assert this with Eventually
 	time.Sleep(2 * time.Second)
-	s.container.ServeHTTP(resp, req)
-	s.Equal(`{
+	s.Eventually(func() bool {
+		req := httptest.NewRequest(http.MethodGet, "/darkrooms", nil)
+		resp := httptest.NewRecorder()
+		s.container.ServeHTTP(resp, req)
+		return resp.Body.String() == `{
  "items": [
   {
    "name": "darkroom-list-sample",
@@ -95,5 +94,6 @@ func (s *EndpointSuite) TestList() {
    "deployState": "Deploying"
   }
  ]
-}`, resp.Body.String())
+}`
+	}, 2*time.Second, 100*time.Millisecond)
 }
