@@ -74,7 +74,6 @@ func (s *EndpointSuite) TestList() {
 	}
 	s.NoError(s.ep.client.Create(ctx, d))
 
-	time.Sleep(2 * time.Second)
 	s.Eventually(func() bool {
 		req := httptest.NewRequest(http.MethodGet, "/darkrooms", nil)
 		resp := httptest.NewRecorder()
