@@ -102,7 +102,8 @@ type DarkroomList struct {
 	Items           []Darkroom `json:"items"`
 }
 
-// +kubebuilder:webhook:path=/mutate-deployments-gojek-io-v1alpha1-darkroom,mutating=true,failurePolicy=fail,groups=deployments.gojek.io,resources=darkrooms,verbs=create;update,versions=v1alpha1,name=mdarkroom.gojek.io
+// +kubebuilder:webhook:path=/mutate-deployments-gojek-io-v1alpha1-darkroom,mutating=true,failurePolicy=fail,groups=deployments.gojek.io,resources=darkrooms,verbs=create;update,versions=v1alpha1,name=mdarkroom.gojek.io,sideEffects=None,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/validate-deployments-gojek-io-v1alpha1-darkroom,mutating=false,failurePolicy=fail,groups=deployments.gojek.io,resources=darkrooms,verbs=create;update;delete,versions=v1alpha1,name=vdarkroom.gojek.io,sideEffects=None,admissionReviewVersions=v1
 
 var _ webhook.Defaulter = &Darkroom{}
 

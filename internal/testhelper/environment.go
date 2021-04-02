@@ -132,7 +132,8 @@ func NewTestEnvironment(CRDDirectoryPaths []string) Environment {
 
 	return &env{
 		k8sEnv: &envtest.Environment{
-			CRDDirectoryPaths: CRDDirectoryPaths,
+			CRDDirectoryPaths:     CRDDirectoryPaths,
+			ErrorIfCRDPathMissing: true,
 			WebhookInstallOptions: envtest.WebhookInstallOptions{
 				MutatingWebhooks: getMutationWebhooks(),
 			},

@@ -30,3 +30,4 @@ covprofile
 # Operator SDK generated files
 bundle/
 bundle.Dockerfile
+.bin/
