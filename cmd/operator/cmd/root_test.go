@@ -66,9 +66,9 @@ func (s *RootCmdSuite) TestControllerStartup() {
 	mm.On("GetConfig").Return(&rest.Config{})
 	mm.On("GetLogger").Return(zap.New(zap.UseDevMode(true)))
 	mm.On("SetFields", mock.Anything).Return(nil)
+	mm.On("Add", mock.AnythingOfType("*controller.Controller")).Return(nil)
 	mm.On("AddHealthzCheck", "healthz", mock.AnythingOfType("healthz.Checker")).Return(nil)
 	mm.On("AddReadyzCheck", "readyz", mock.AnythingOfType("healthz.Checker")).Return(nil)
-	mm.On("Add", mock.AnythingOfType("*controller.Controller")).Return(nil)
 
 	s.rootCmd = newRootCmd(rootCmdOpts{
 		SetupSignalHandler: func() context.Context {
@@ -135,9 +135,9 @@ func (s *RootCmdSuite) TestControllerStartupWithManagerStartError() {
 	mm.On("GetConfig").Return(&rest.Config{})
 	mm.On("GetLogger").Return(zap.New(zap.UseDevMode(true)))
 	mm.On("SetFields", mock.Anything).Return(nil)
+	mm.On("Add", mock.AnythingOfType("*controller.Controller")).Return(nil)
 	mm.On("AddHealthzCheck", "healthz", mock.AnythingOfType("healthz.Checker")).Return(nil)
 	mm.On("AddReadyzCheck", "readyz", mock.AnythingOfType("healthz.Checker")).Return(nil)
-	mm.On("Add", mock.AnythingOfType("*controller.Controller")).Return(nil)
 
 	s.rootCmd = newRootCmd(rootCmdOpts{
 		SetupSignalHandler: func() context.Context {
@@ -174,9 +174,9 @@ func (s *RootCmdSuite) TestControllerSetupError() {
 	mm.On("GetConfig").Return(&rest.Config{})
 	mm.On("GetLogger").Return(zap.New(zap.UseDevMode(true)))
 	mm.On("SetFields", mock.Anything).Return(nil)
+	mm.On("Add", mock.AnythingOfType("*controller.Controller")).Return(controllerAddErr)
 	mm.On("AddHealthzCheck", "healthz", mock.AnythingOfType("healthz.Checker")).Return(nil)
 	mm.On("AddReadyzCheck", "readyz", mock.AnythingOfType("healthz.Checker")).Return(nil)
-	mm.On("Add", mock.AnythingOfType("*controller.Controller")).Return(controllerAddErr)
 
 	s.rootCmd = newRootCmd(rootCmdOpts{
 		SetupSignalHandler: func() context.Context {
@@ -198,6 +198,83 @@ func (s *RootCmdSuite) TestControllerSetupError() {
 
 	s.cancelCtx()
 	s.EqualError(<-errCh, controllerAddErr.Error())
+}
+
+func (s *RootCmdSuite) TestControllerAddHealthzCheckError() {
+	errCh := make(chan error)
+	controllerAddHealthzCheckErr := errors.New("can't add healthz check")
+
+	mm := &mockManager{}
+	mc := &mocks.MockClient{RuntimeScheme: internalRuntime.Scheme()}
+
+	mm.On("Start", mock.AnythingOfType("*context.cancelCtx")).Return(nil)
+	mm.On("GetClient").Return(mc)
+	mm.On("GetScheme").Return(internalRuntime.Scheme())
+	mm.On("GetConfig").Return(&rest.Config{})
+	mm.On("GetLogger").Return(zap.New(zap.UseDevMode(true)))
+	mm.On("SetFields", mock.Anything).Return(nil)
+	mm.On("Add", mock.AnythingOfType("*controller.Controller")).Return(nil)
+	mm.On("AddHealthzCheck", "healthz", mock.AnythingOfType("healthz.Checker")).Return(controllerAddHealthzCheckErr)
+
+	s.rootCmd = newRootCmd(rootCmdOpts{
+		SetupSignalHandler: func() context.Context {
+			return s.ctx
+		},
+		NewManager: func(config *rest.Config, options ctrl.Options) (ctrl.Manager, error) {
+			return mm, nil
+		},
+		GetConfigOrDie: func() *rest.Config {
+			return nil
+		},
+	})
+	s.rootCmd.SetOut(s.buf)
+
+	go func() {
+		defer close(errCh)
+		errCh <- s.rootCmd.Execute()
+	}()
+
+	s.cancelCtx()
+	s.EqualError(<-errCh, controllerAddHealthzCheckErr.Error())
+}
+
+func (s *RootCmdSuite) TestControllerAddReadyzCheckError() {
+	errCh := make(chan error)
+	controllerAddReadyzCheckErr := errors.New("can't add readyz check")
+
+	mm := &mockManager{}
+	mc := &mocks.MockClient{RuntimeScheme: internalRuntime.Scheme()}
+
+	mm.On("Start", mock.AnythingOfType("*context.cancelCtx")).Return(nil)
+	mm.On("GetClient").Return(mc)
+	mm.On("GetScheme").Return(internalRuntime.Scheme())
+	mm.On("GetConfig").Return(&rest.Config{})
+	mm.On("GetLogger").Return(zap.New(zap.UseDevMode(true)))
+	mm.On("SetFields", mock.Anything).Return(nil)
+	mm.On("Add", mock.AnythingOfType("*controller.Controller")).Return(nil)
+	mm.On("AddHealthzCheck", "healthz", mock.AnythingOfType("healthz.Checker")).Return(nil)
+	mm.On("AddReadyzCheck", "readyz", mock.AnythingOfType("healthz.Checker")).Return(controllerAddReadyzCheckErr)
+
+	s.rootCmd = newRootCmd(rootCmdOpts{
+		SetupSignalHandler: func() context.Context {
+			return s.ctx
+		},
+		NewManager: func(config *rest.Config, options ctrl.Options) (ctrl.Manager, error) {
+			return mm, nil
+		},
+		GetConfigOrDie: func() *rest.Config {
+			return nil
+		},
+	})
+	s.rootCmd.SetOut(s.buf)
+
+	go func() {
+		defer close(errCh)
+		errCh <- s.rootCmd.Execute()
+	}()
+
+	s.cancelCtx()
+	s.EqualError(<-errCh, controllerAddReadyzCheckErr.Error())
 }
 
 type mockManager struct {

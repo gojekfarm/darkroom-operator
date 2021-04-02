@@ -87,14 +87,17 @@ type Darkroom struct {
 }
 
 func (d *Darkroom) ValidateCreate() error {
+	log.Info("validate create", "name", d.Name)
 	return nil
 }
 
 func (d *Darkroom) ValidateUpdate(old runtime.Object) error {
+	log.Info("validate update", "name", d.Name)
 	return nil
 }
 
 func (d *Darkroom) ValidateDelete() error {
+	log.Info("validate delete", "name", d.Name)
 	return nil
 }
 

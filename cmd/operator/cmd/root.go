@@ -31,7 +31,7 @@ func newRootCmd(opts rootCmdOpts) *cobra.Command {
 		Use:   "darkroom-operator",
 		Short: "Darkroom Operator helps deploy Darkroom in a Kubernetes Cluster",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			pkglog.SetLogger(zap.New(zap.UseDevMode(true), zap.WriteTo(cmd.OutOrStderr())))
+			pkglog.SetLogger(zap.New(zap.UseDevMode(true), zap.WriteTo(cmd.OutOrStdout())))
 
 			mgr, err := opts.NewManager(opts.GetConfigOrDie(), ctrl.Options{
 				Scheme:                 runtime.Scheme(),
@@ -49,7 +49,7 @@ func newRootCmd(opts rootCmdOpts) *cobra.Command {
 
 			r := &controllers.DarkroomReconciler{
 				Client: mgr.GetClient(),
-				Log:    ctrl.Log.WithName("controllers").WithName("Darkroom"),
+				Log:    pkglog.Log.WithName("controllers").WithName("darkroom-reconciler"),
 				Scheme: mgr.GetScheme(),
 			}
 
