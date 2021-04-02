@@ -20,7 +20,7 @@ TBD
 
 ## Dev Environment Setup
 
-#### Install [Operator SDK](https://sdk.operatorframework.io/docs/installation/install-operator-sdk/)
+#### Install [Operator SDK](https://sdk.operatorframework.io/docs/installation/install-operator-sdk/) v1.5.0
 
 ```shell script
 brew install operator-sdk

@@ -1,34 +1,25 @@
 package cmd
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/gojekfarm/darkroom-operator/cmd/version"
 	apiserver "github.com/gojekfarm/darkroom-operator/internal/api-server"
-	deploymentsv1alpha1 "github.com/gojekfarm/darkroom-operator/pkg/api/v1alpha1"
+	"github.com/gojekfarm/darkroom-operator/internal/runtime"
 	pkglog "github.com/gojekfarm/darkroom-operator/pkg/log"
 )
 
 var (
-	scheme   = runtime.NewScheme()
 	setupLog = pkglog.Log.WithName("api-server").WithName("setup")
 )
-
-func init() {
-	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
-	utilruntime.Must(deploymentsv1alpha1.AddToScheme(scheme))
-	// +kubebuilder:scaffold:scheme
-}
 
 func newRootCmd(opts rootCmdOpts) *cobra.Command {
 	args := struct {
@@ -39,7 +30,7 @@ func newRootCmd(opts rootCmdOpts) *cobra.Command {
 			pkglog.SetLogger(zap.New(zap.UseDevMode(true), zap.WriteTo(c.OutOrStderr())))
 
 			mgr, err := opts.NewManager(opts.GetConfigOrDie(), apiserver.Options{
-				Scheme: scheme,
+				Scheme: runtime.Scheme(),
 				Port:   args.port,
 			})
 			if err != nil {
@@ -56,7 +47,7 @@ func newRootCmd(opts rootCmdOpts) *cobra.Command {
 }
 
 type rootCmdOpts struct {
-	SetupSignalHandler func() (stopCh <-chan struct{})
+	SetupSignalHandler func() context.Context
 	NewManager         apiserver.NewManagerFunc
 	GetConfigOrDie     func() *rest.Config
 }
@@ -67,7 +58,7 @@ func NewRootCmd() *cobra.Command {
 		NewManager: apiserver.NewManager(apiserver.NewManagerFuncOptions{
 			NewDynamicRESTMapper: apiutil.NewDynamicRESTMapper,
 			NewCache:             cache.New,
-			NewClient:            client.New,
+			NewClientBuilder:     manager.NewClientBuilder(),
 		}),
 		GetConfigOrDie: ctrl.GetConfigOrDie,
 	})

@@ -1,4 +1,4 @@
-package testhelper
+package runtime
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
@@ -8,11 +8,15 @@ import (
 	deploymentsv1alpha1 "github.com/gojekfarm/darkroom-operator/pkg/api/v1alpha1"
 )
 
-var Scheme = runtime.NewScheme()
+var scheme = runtime.NewScheme()
 
 func init() {
-	utilruntime.Must(clientgoscheme.AddToScheme(Scheme))
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(deploymentsv1alpha1.AddToScheme(Scheme))
+	utilruntime.Must(deploymentsv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
+}
+
+func Scheme() *runtime.Scheme {
+	return scheme
 }

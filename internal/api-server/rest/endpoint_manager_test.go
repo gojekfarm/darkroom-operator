@@ -8,11 +8,12 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/gojekfarm/darkroom-operator/internal/runtime"
 	"github.com/gojekfarm/darkroom-operator/internal/testhelper/mocks"
 )
 
 func TestVersionRouteOnNewEndpointManager(t *testing.T) {
-	mc := &mocks.MockClient{}
+	mc := &mocks.MockClient{RuntimeScheme: runtime.Scheme()}
 	c := restful.NewContainer()
 
 	em := NewEndpointManager(mc)

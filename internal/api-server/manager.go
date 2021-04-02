@@ -1,6 +1,7 @@
 package apiserver
 
 import (
+	"context"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -9,6 +10,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+	mgr "sigs.k8s.io/controller-runtime/pkg/manager"
 
 	endpointRest "github.com/gojekfarm/darkroom-operator/internal/api-server/rest"
 )
@@ -22,23 +24,27 @@ type NewManagerFunc func(config *rest.Config, options Options) (Manager, error)
 type NewManagerFuncOptions struct {
 	NewDynamicRESTMapper func(cfg *rest.Config, opts ...apiutil.DynamicRESTMapperOption) (meta.RESTMapper, error)
 	NewCache             cache.NewCacheFunc
-	NewClient            func(config *rest.Config, options client.Options) (client.Client, error)
+	NewClientBuilder     mgr.ClientBuilder
 }
 
 type Options struct {
-	Scheme         *runtime.Scheme
-	Namespace      string
-	Port           int
-	AllowedDomains []string
+	Scheme                *runtime.Scheme
+	Namespace             string
+	Port                  int
+	ClientBuilder         mgr.ClientBuilder
+	ClientDisableCacheFor []client.Object
+	AllowedDomains        []string
 }
 
 type Manager interface {
-	Start(stop <-chan struct{}) error
+	Start(context.Context) error
 }
 
 type manager struct {
 	em              endpointRest.EndpointManager
 	started         bool
+	internalCtx     context.Context
+	internalCancel  context.CancelFunc
 	internalStop    <-chan struct{}
 	internalStopper chan<- struct{}
 	cache           cache.Cache
@@ -64,19 +70,14 @@ func NewManager(newOpts NewManagerFuncOptions) NewManagerFunc {
 			return nil, err
 		}
 
-		c, err := newOpts.NewClient(config, client.Options{Scheme: options.Scheme, Mapper: mapper})
+		c, err := newOpts.NewClientBuilder.
+			WithUncached(options.ClientDisableCacheFor...).
+			Build(cc, config, client.Options{Scheme: options.Scheme, Mapper: mapper})
 		if err != nil {
 			return nil, err
 		}
 
-		em := endpointRest.NewEndpointManager(&client.DelegatingClient{
-			Reader: &client.DelegatingReader{
-				CacheReader:  cc,
-				ClientReader: c,
-			},
-			Writer:       c,
-			StatusClient: c,
-		})
+		em := endpointRest.NewEndpointManager(c)
 
 		stop := make(chan struct{})
 		return &manager{
@@ -91,10 +92,10 @@ func NewManager(newOpts NewManagerFuncOptions) NewManagerFunc {
 	}
 }
 
-func (m *manager) Start(stop <-chan struct{}) error {
-	defer close(m.internalStopper)
-	m.waitForCache()
+func (m *manager) Start(ctx context.Context) error {
+	m.internalCtx, m.internalCancel = context.WithCancel(ctx)
 
+	m.waitForCache()
 	srv := newApiServer(m.port, m.allowedDomains, m.em)
 
 	go func() {
@@ -103,7 +104,7 @@ func (m *manager) Start(stop <-chan struct{}) error {
 		}
 	}()
 	select {
-	case <-stop:
+	case <-ctx.Done():
 		return nil
 	case err := <-m.errChan:
 		return err
@@ -116,11 +117,11 @@ func (m *manager) waitForCache() {
 	}
 
 	go func() {
-		if err := m.cache.Start(m.internalStop); err != nil {
+		if err := m.cache.Start(m.internalCtx); err != nil {
 			m.errChan <- err
 		}
 	}()
 
-	m.cache.WaitForCacheSync(m.internalStop)
+	m.cache.WaitForCacheSync(m.internalCtx)
 	m.started = true
 }

@@ -26,7 +26,6 @@ package controllers
 
 import (
 	"context"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -40,6 +39,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/gojekfarm/darkroom-operator/internal/runtime"
 	"github.com/gojekfarm/darkroom-operator/internal/testhelper"
 	deploymentsv1alpha1 "github.com/gojekfarm/darkroom-operator/pkg/api/v1alpha1"
 	// +kubebuilder:scaffold:imports
@@ -56,10 +56,10 @@ func TestDarkroomControllerSuite(t *testing.T) {
 }
 
 func (s *DarkroomControllerSuite) SetupSuite() {
-	s.testEnv = testhelper.NewTestEnvironment([]string{filepath.Join("..", "..", "config", "crd", "bases")})
+	s.testEnv = testhelper.NewTestEnvironment("..", "..")
 	s.reconciler = &DarkroomReconciler{
 		Log:    s.testEnv.GetLogger().WithName("controllers").WithName("Darkroom"),
-		Scheme: testhelper.Scheme,
+		Scheme: runtime.Scheme(),
 	}
 	s.testEnv.Add(s.reconciler)
 	s.NoError(s.testEnv.Start())
@@ -122,7 +122,7 @@ func (s *DarkroomControllerSuite) TestReconcile() {
 			},
 			preReconcileRun: func(ctx context.Context, c client.Client, d *deploymentsv1alpha1.Darkroom) error {
 				// hack to run reconcile func and check if err is nil
-				_, err := s.reconciler.Reconcile(ctrl.Request{
+				_, err := s.reconciler.Reconcile(ctx, ctrl.Request{
 					NamespacedName: types.NamespacedName{
 						Namespace: d.Namespace,
 						Name:      d.Name,

@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/gojekfarm/darkroom-operator/internal/controllers"
+	"github.com/gojekfarm/darkroom-operator/internal/runtime"
 	"github.com/gojekfarm/darkroom-operator/internal/testhelper"
 	"github.com/gojekfarm/darkroom-operator/pkg/api/v1alpha1"
 )
@@ -30,10 +30,10 @@ func TestEndpoint(t *testing.T) {
 }
 
 func (s *EndpointSuite) SetupSuite() {
-	s.testEnv = testhelper.NewTestEnvironment([]string{filepath.Join("..", "..", "..", "..", "config", "crd", "bases")})
+	s.testEnv = testhelper.NewTestEnvironment("..", "..", "..", "..")
 	s.reconciler = &controllers.DarkroomReconciler{
 		Log:    s.testEnv.GetLogger().WithName("controllers").WithName("Darkroom"),
-		Scheme: testhelper.Scheme,
+		Scheme: runtime.Scheme(),
 	}
 	s.testEnv.Add(s.reconciler)
 
