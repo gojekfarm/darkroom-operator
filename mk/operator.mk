@@ -8,7 +8,7 @@ else
 	VERSION := $(CONTROLLER_VERSION)
 endif
 
-BUNDLE_IMG ?= controller-bundle:$(CONTROLLER_VERSION)
+BUNDLE_IMG ?= darkroom-controller-bundle:$(CONTROLLER_VERSION)
 IMG ?= darkroom-controller:$(CONTROLLER_VERSION)
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
@@ -49,6 +49,9 @@ operator/manifests: controller-gen ## Generate manifests e.g. CRD, RBAC etc.
 
 operator/generate: controller-gen ## Generate operator code
 	@$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+
+operator/run-olm-build: bundle-build
+	@operator-sdk run bundle $(BUNDLE_IMG)
 
 operator/docker-build: test ## Build the docker image
 	@docker build -f build/package/operator.Dockerfile -t ${IMG} .

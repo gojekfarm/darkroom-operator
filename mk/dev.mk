@@ -1,5 +1,6 @@
 dev/create-cluster: kind
 	@$(KIND_BIN) create cluster
+	@operator-sdk olm install
 
 dev/delete-cluster: kind
 	@$(KIND_BIN) delete cluster
