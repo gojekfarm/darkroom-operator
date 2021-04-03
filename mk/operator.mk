@@ -58,7 +58,7 @@ operator/docker-push: ## Push the docker image
 
 .PHONY: bundle
 bundle: operator/manifests ## Generate bundle manifests and metadata, then validate generated files
-	@operator-sdk generate kustomize manifests -q
+	@ln -s pkg/api api && operator-sdk generate kustomize manifests -q && rm api
 	@cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	@$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle -q --overwrite --version $(CONTROLLER_VERSION) $(BUNDLE_METADATA_OPTS)
 	@operator-sdk bundle validate ./bundle
