@@ -42,17 +42,40 @@ spec:
                 minItems: 1
                 type: array
               pathPrefix:
+                description: PathPrefix prepends the prefix in the URL when serving
+                  images
                 type: string
               source:
                 properties:
                   baseUrl:
                     type: string
+                  bucket:
+                    properties:
+                      accessKey:
+                        type: string
+                      credentialsJson:
+                        type: string
+                      name:
+                        minLength: 3
+                        type: string
+                      secretKey:
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  prefix:
+                    default: /
+                    type: string
                   type:
                     description: 'Type specifies storage backend to use with darkroom.
                       Valid values are: - "WebFolder": simple storage backend to serve
-                      images from a hosted image source;'
+                      images from a hosted image source; - "S3": storage backend to
+                      serve images from S3 backend; - "GoogleCloudStorage": storage
+                      backend to serve images from GoogleCloudStorage backend;'
                     enum:
                     - WebFolder
+                    - S3
+                    - GoogleCloudStorage
                     type: string
                 required:
                 - type

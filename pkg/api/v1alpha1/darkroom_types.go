@@ -26,32 +26,33 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
-// +kubebuilder:validation:Enum=WebFolder
+// +kubebuilder:validation:Enum=WebFolder;S3;GoogleCloudStorage
 type Type string
 
 type DeployState string
 
 const (
-	WebFolder Type = "WebFolder"
-
 	Deploying DeployState = "Deploying"
 )
-
-type WebFolderMeta struct {
-	BaseURL string `json:"baseUrl,omitempty"`
-}
 
 type Source struct {
 	// Type specifies storage backend to use with darkroom.
 	// Valid values are:
 	// - "WebFolder": simple storage backend to serve images from a hosted image source;
+	// - "S3": storage backend to serve images from S3 backend;
+	// - "GoogleCloudStorage": storage backend to serve images from GoogleCloudStorage backend;
 	Type Type `json:"type"`
 
 	WebFolderMeta `json:",inline"`
+
+	Bucket *Bucket `json:"bucket,omitempty"`
+
+	// +kubebuilder:default="/"
+	// +optional
+	Prefix string `json:"prefix,omitempty"`
 }
 
 // DarkroomSpec defines the desired state of Darkroom
@@ -60,7 +61,9 @@ type DarkroomSpec struct {
 	Version string `json:"version"`
 
 	Source Source `json:"source"`
+
 	// +optional
+	// PathPrefix prepends the prefix in the URL when serving images
 	PathPrefix string `json:"pathPrefix,omitempty"`
 
 	// +kubebuilder:validation:MinItems=1
@@ -84,29 +87,6 @@ type Darkroom struct {
 
 	Spec   DarkroomSpec   `json:"spec,omitempty"`
 	Status DarkroomStatus `json:"status,omitempty"`
-}
-
-func (d *Darkroom) ValidateCreate() error {
-	log.Info("validate create", "name", d.Name)
-	return nil
-}
-
-func (d *Darkroom) ValidateUpdate(old runtime.Object) error {
-	log.Info("validate update", "name", d.Name)
-	return nil
-}
-
-func (d *Darkroom) ValidateDelete() error {
-	log.Info("validate delete", "name", d.Name)
-	return nil
-}
-
-func (d *Darkroom) Default() {
-	log.Info("default", "name", d.Name)
-
-	if d.Spec.Version == "" {
-		d.Spec.Version = "latest"
-	}
 }
 
 // +kubebuilder:object:root=true

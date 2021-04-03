@@ -29,12 +29,13 @@ package v1alpha1
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/scheme"
+
+	pkglog "github.com/gojekfarm/darkroom-operator/pkg/log"
 )
 
 var (
-	log = logf.Log.WithName("darkroom-resource")
+	log = pkglog.Log.WithName("darkroom-resource")
 
 	// GroupVersion is group version used to register these objects
 	GroupVersion = schema.GroupVersion{Group: "deployments.gojek.io", Version: "v1alpha1"}
