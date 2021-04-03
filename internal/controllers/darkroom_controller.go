@@ -53,9 +53,9 @@ type DarkroomReconciler struct {
 // +kubebuilder:rbac:groups="",resources=configmaps;services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="apps",resources=deployments,verbs=get;list;watch;create;update;patch;delete
 
-func (r *DarkroomReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	ctx := context.Background()
-	_ = r.Log.WithValues("darkroom", req.NamespacedName)
+func (r *DarkroomReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	l := r.Log.WithValues("darkroom", req.NamespacedName)
+	l.Info("reconciling")
 	var darkroom deploymentsv1alpha1.Darkroom
 
 	if err := r.Get(ctx, req.NamespacedName, &darkroom); err != nil {

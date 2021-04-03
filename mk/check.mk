@@ -1,30 +1,30 @@
+##@ Utils
+
 .PHONY: fmt
-fmt: fmt/go ## Dev: Run format tools
+fmt: fmt/go ## Run format tools
 
 .PHONY: fmt/go
-fmt/go: ## Dev: Run go fmt
+fmt/go: ## Run go fmt
 	@go fmt $(GOFLAGS) ./...
 
 .PHONY: vet
-vet: ## Dev: Run go vet
+vet: ## Run go vet
 	@go vet $(GOFLAGS) ./...
 
 .PHONY: lint
-lint: golangci-lint ## Dev: Runs all linters
-
-golangci-lint: golangci-lint-dep ## Dev: Runs golang linter
+lint: require/golangci-lint ## Runs all linters
 	@$(GOLANGCI_LINT) run --timeout=10m -v
 
 .PHONY: imports
-imports: goimports ## Dev: Runs goimports in order to organize imports
+imports: require/goimports ## Runs goimports in order to organize imports
 	@$(GOIMPORTS) -w -local github.com/gojekfarm/darkroom-operator -d `find . -type f -name '*.go'`
 
 .PHONY: check
-check: operator/generate operator/manifests fmt vet golangci-lint imports ## Dev: Run code checks (go fmt, go vet, ...)
+check: operator/generate operator/manifests fmt vet lint imports ## Run code checks (go fmt, go vet, ...)
 	@git diff --quiet || test $$(git diff --name-only | grep -v -e 'go.mod$$' -e 'go.sum$$' | wc -l) -eq 0 || ( echo "The following changes (result of code generators and code checks) have been detected:" && git --no-pager diff && false ) # fail if Git working tree is dirty
 
 # find or download golangci-lint
-golangci-lint-dep:
+require/golangci-lint:
 ifeq (, $(shell which golangci-lint))
 	@{ \
 	set -e ;\
@@ -40,7 +40,7 @@ GOLANGCI_LINT=$(shell which golangci-lint)
 endif
 
 # find or download goimports
-goimports:
+require/goimports:
 ifeq (, $(shell which goimports))
 	@{ \
 	set -e ;\

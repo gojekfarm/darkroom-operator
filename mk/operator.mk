@@ -8,7 +8,7 @@ else
 	VERSION := $(CONTROLLER_VERSION)
 endif
 
-BUNDLE_IMG ?= controller-bundle:$(CONTROLLER_VERSION)
+BUNDLE_IMG ?= darkroom-controller-bundle:$(CONTROLLER_VERSION)
 IMG ?= darkroom-controller:$(CONTROLLER_VERSION)
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
@@ -31,21 +31,29 @@ operator/manager/test: operator/generate fmt vet manifests ## Run manager tests
 operator/manager/build: operator/generate ## Build manager binary
 	@$(GO_BUILD) -o $(CONTROLLER_EXECUTABLE) cmd/operator/main.go
 
-operator/install: operator/manifests kustomize ## Install CRDs into a cluster
+##@ Deployment
+
+operator/install: operator/manifests require/kustomize ## Install CRDs into a cluster
 	@$(KUSTOMIZE) build config/crd | kubectl apply -f -
 
-operator/uninstall: operator/manifests kustomize ## Uninstall CRDs from a cluster
+operator/uninstall: operator/manifests require/kustomize ## Uninstall CRDs from a cluster
 	@$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
-operator/deploy: operator/manifests kustomize ## Deploy controller in the configured Kubernetes cluster in ~/.kube/config
+operator/deploy: operator/manifests require/kustomize ## Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 	@cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	@$(KUSTOMIZE) build config/default | kubectl apply -f -
 
-operator/manifests: controller-gen ## Generate manifests e.g. CRD, RBAC etc.
+operator/undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
+	@$(KUSTOMIZE) build config/default | kubectl delete -f -
+
+operator/manifests: require/controller-gen ## Generate manifests e.g. CRD, RBAC etc.
 	@$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
-operator/generate: controller-gen ## Generate operator code
+operator/generate: require/controller-gen ## Generate operator code
 	@$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+
+operator/run-olm-build: bundle-build
+	@operator-sdk run bundle $(BUNDLE_IMG)
 
 operator/docker-build: test ## Build the docker image
 	@docker build -f build/package/operator.Dockerfile -t ${IMG} .
@@ -55,7 +63,7 @@ operator/docker-push: ## Push the docker image
 
 .PHONY: bundle
 bundle: operator/manifests ## Generate bundle manifests and metadata, then validate generated files
-	@operator-sdk generate kustomize manifests -q
+	@ln -s pkg/api api && operator-sdk generate kustomize manifests -q && rm api
 	@cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	@$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle -q --overwrite --version $(CONTROLLER_VERSION) $(BUNDLE_METADATA_OPTS)
 	@operator-sdk bundle validate ./bundle
@@ -67,34 +75,10 @@ bundle-build: ## Build the bundle image
 .PHONY: install
 install: operator/install ## Install all requites to the cluster
 
-# find or download controller-gen
-# download controller-gen if necessary
-controller-gen:
-ifeq (, $(shell which controller-gen))
-	@{ \
-	set -e ;\
-	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
-	cd $$CONTROLLER_GEN_TMP_DIR ;\
-	go mod init tmp ;\
-	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.3.0 ;\
-	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
-	}
-CONTROLLER_GEN=$(GOBIN)/controller-gen
-else
-CONTROLLER_GEN=$(shell which controller-gen)
-endif
+CONTROLLER_GEN = $(shell pwd)/.bin/controller-gen
+require/controller-gen: ## Download controller-gen locally if necessary.
+	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.4.1)
 
-kustomize:
-ifeq (, $(shell which kustomize))
-	@{ \
-	set -e ;\
-	KUSTOMIZE_GEN_TMP_DIR=$$(mktemp -d) ;\
-	cd $$KUSTOMIZE_GEN_TMP_DIR ;\
-	go mod init tmp ;\
-	go get sigs.k8s.io/kustomize/kustomize/v3@v3.5.4 ;\
-	rm -rf $$KUSTOMIZE_GEN_TMP_DIR ;\
-	}
-KUSTOMIZE=$(GOBIN)/kustomize
-else
-KUSTOMIZE=$(shell which kustomize)
-endif
+KUSTOMIZE = $(shell pwd)/.bin/kustomize
+require/kustomize: ## Download kustomize locally if necessary.
+	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v3@v3.8.7)

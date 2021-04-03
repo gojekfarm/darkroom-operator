@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"sync"
 	"testing"
@@ -17,9 +18,10 @@ import (
 
 type RootCmdSuite struct {
 	suite.Suite
-	rootCmd *cobra.Command
-	buf     *bytes.Buffer
-	stopCh  chan struct{}
+	rootCmd   *cobra.Command
+	buf       *bytes.Buffer
+	ctx       context.Context
+	cancelCtx func()
 }
 
 func TestRootCmd(t *testing.T) {
@@ -27,7 +29,7 @@ func TestRootCmd(t *testing.T) {
 }
 
 func (s *RootCmdSuite) SetupTest() {
-	s.stopCh = make(chan struct{})
+	s.ctx, s.cancelCtx = context.WithCancel(context.Background())
 	s.buf = &bytes.Buffer{}
 }
 
@@ -44,14 +46,14 @@ func (s *RootCmdSuite) TestControllerStartup() {
 
 	mm := &mockManager{}
 
-	mm.On("Start", mock.AnythingOfType("<-chan struct {}")).Return(nil)
+	mm.On("Start", mock.AnythingOfType("*context.cancelCtx")).Return(nil)
 
 	s.rootCmd = newRootCmd(rootCmdOpts{
-		SetupSignalHandler: func() <-chan struct{} {
+		SetupSignalHandler: func() context.Context {
 			time.AfterFunc(2*time.Second, func() {
 				wg.Done()
 			})
-			return s.stopCh
+			return s.ctx
 		},
 		NewManager: func(config *rest.Config, options apiserver.Options) (apiserver.Manager, error) {
 			return mm, nil
@@ -68,7 +70,7 @@ func (s *RootCmdSuite) TestControllerStartup() {
 	}()
 
 	wg.Wait()
-	close(s.stopCh)
+	s.cancelCtx()
 	s.NoError(<-errCh)
 }
 
@@ -77,8 +79,8 @@ func (s *RootCmdSuite) TestControllerStartupWithNewManagerError() {
 	managerErr := errors.New("unable to create manager")
 
 	s.rootCmd = newRootCmd(rootCmdOpts{
-		SetupSignalHandler: func() <-chan struct{} {
-			return s.stopCh
+		SetupSignalHandler: func() context.Context {
+			return s.ctx
 		},
 		NewManager: func(config *rest.Config, options apiserver.Options) (apiserver.Manager, error) {
 			return nil, managerErr
@@ -94,7 +96,7 @@ func (s *RootCmdSuite) TestControllerStartupWithNewManagerError() {
 		errCh <- s.rootCmd.Execute()
 	}()
 
-	close(s.stopCh)
+	s.cancelCtx()
 	s.EqualError(<-errCh, managerErr.Error())
 }
 
@@ -104,11 +106,11 @@ func (s *RootCmdSuite) TestControllerStartupWithManagerStartError() {
 
 	mm := &mockManager{}
 
-	mm.On("Start", mock.AnythingOfType("<-chan struct {}")).Return(startErr)
+	mm.On("Start", mock.AnythingOfType("*context.cancelCtx")).Return(startErr)
 
 	s.rootCmd = newRootCmd(rootCmdOpts{
-		SetupSignalHandler: func() <-chan struct{} {
-			return s.stopCh
+		SetupSignalHandler: func() context.Context {
+			return s.ctx
 		},
 		NewManager: func(config *rest.Config, options apiserver.Options) (apiserver.Manager, error) {
 			return mm, nil
@@ -124,7 +126,7 @@ func (s *RootCmdSuite) TestControllerStartupWithManagerStartError() {
 		errCh <- s.rootCmd.Execute()
 	}()
 
-	close(s.stopCh)
+	s.cancelCtx()
 	s.EqualError(<-errCh, startErr.Error())
 }
 
@@ -132,6 +134,6 @@ type mockManager struct {
 	mock.Mock
 }
 
-func (m *mockManager) Start(stopCh <-chan struct{}) error {
-	return m.Called(stopCh).Error(0)
+func (m *mockManager) Start(ctx context.Context) error {
+	return m.Called(ctx).Error(0)
 }

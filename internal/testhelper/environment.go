@@ -2,16 +2,16 @@ package testhelper
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"net"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
-	admissionv1beta1 "k8s.io/api/admissionregistration/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	"go.uber.org/zap/zapcore"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -20,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/gojekfarm/darkroom-operator/internal/controllers/setup"
+	"github.com/gojekfarm/darkroom-operator/internal/runtime"
 )
 
 type Environment interface {
@@ -33,11 +34,12 @@ type Environment interface {
 }
 
 type env struct {
+	ctx         context.Context
+	cancelCtx   func()
 	k8sEnv      *envtest.Environment
 	cfg         *rest.Config
 	logger      logr.Logger
 	buf         *bytes.Buffer
-	stopCh      chan struct{}
 	mgr         ctrl.Manager
 	reconcilers []reconcile.Reconciler
 }
@@ -52,11 +54,11 @@ func (e *env) Start() error {
 
 	if len(e.reconcilers) > 0 {
 		e.mgr, err = ctrl.NewManager(c, ctrl.Options{
-			Scheme:             Scheme,
+			Scheme:             runtime.Scheme(),
 			CertDir:            e.k8sEnv.WebhookInstallOptions.LocalServingCertDir,
 			Host:               e.k8sEnv.WebhookInstallOptions.LocalServingHost,
 			Port:               e.k8sEnv.WebhookInstallOptions.LocalServingPort,
-			MetricsBindAddress: fmt.Sprintf(":%d", freePort()),
+			MetricsBindAddress: fmt.Sprintf(":%d", FreePort()),
 		})
 		if err != nil {
 			panic(err)
@@ -76,7 +78,7 @@ func (e *env) Start() error {
 			}
 		}
 		go func() {
-			err := e.mgr.Start(e.stopCh)
+			err := e.mgr.Start(e.ctx)
 			if err != nil {
 				errCh <- err
 			}
@@ -105,7 +107,7 @@ func (e *env) Add(reconciler reconcile.Reconciler) {
 }
 
 func (e *env) Stop() error {
-	close(e.stopCh)
+	e.cancelCtx()
 	return e.k8sEnv.Stop()
 }
 
@@ -125,66 +127,35 @@ func (e *env) ResetLogs() {
 	e.buf.Reset()
 }
 
-func NewTestEnvironment(CRDDirectoryPaths []string) Environment {
+func NewTestEnvironment(dirElems ...string) Environment {
 	b := &bytes.Buffer{}
-	l := zap.New(zap.UseDevMode(true), zap.WriteTo(b))
+	l := zap.New(zap.UseDevMode(true), zap.WriteTo(b), zap.Level(zapcore.DebugLevel))
 	logf.SetLogger(l)
 
+	crdPaths := append(dirElems, "config", "crd", "bases")
+	webhookPaths := append(dirElems, "config", "webhook")
+
+	ctx, cancel := context.WithCancel(context.Background())
+
 	return &env{
+		ctx:       ctx,
+		cancelCtx: cancel,
 		k8sEnv: &envtest.Environment{
-			CRDDirectoryPaths: CRDDirectoryPaths,
+			CRDInstallOptions: envtest.CRDInstallOptions{
+				Paths:              []string{filepath.Join(crdPaths...)},
+				ErrorIfPathMissing: true,
+			},
 			WebhookInstallOptions: envtest.WebhookInstallOptions{
-				MutatingWebhooks: getMutationWebhooks(),
+				Paths: []string{filepath.Join(webhookPaths...)},
 			},
 		},
 		reconcilers: []reconcile.Reconciler{},
 		buf:         b,
 		logger:      l,
-		stopCh:      make(chan struct{}),
 	}
 }
 
-func getMutationWebhooks() []runtime.Object {
-	failedTypeV1Beta1 := admissionv1beta1.Fail
-	webhookPathV1 := "/mutate-deployments-gojek-io-v1alpha1-darkroom"
-
-	return []runtime.Object{
-		&admissionv1beta1.MutatingWebhookConfiguration{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "mutating-webhook-configuration",
-			},
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "MutatingWebhookConfiguration",
-				APIVersion: "admissionregistration.k8s.io/v1beta1",
-			},
-			Webhooks: []admissionv1beta1.MutatingWebhook{
-				{
-					Name: "mdarkroom.gojek.io",
-					ClientConfig: admissionv1beta1.WebhookClientConfig{
-						Service: &admissionv1beta1.ServiceReference{
-							Name:      "webhook-service",
-							Namespace: "system",
-							Path:      &webhookPathV1,
-						},
-					},
-					Rules: []admissionv1beta1.RuleWithOperations{
-						{
-							Operations: []admissionv1beta1.OperationType{"CREATE", "UPDATE"},
-							Rule: admissionv1beta1.Rule{
-								APIGroups:   []string{"deployments.gojek.io"},
-								APIVersions: []string{"v1alpha1"},
-								Resources:   []string{"darkrooms"},
-							},
-						},
-					},
-					FailurePolicy: &failedTypeV1Beta1,
-				},
-			},
-		},
-	}
-}
-
-func freePort() int {
+func FreePort() int {
 	addr, _ := net.ResolveTCPAddr("tcp", "localhost:0")
 	l, _ := net.ListenTCP("tcp", addr)
 	defer l.Close()

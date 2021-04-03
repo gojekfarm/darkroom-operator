@@ -20,7 +20,7 @@ TBD
 
 ## Dev Environment Setup
 
-#### Install [Operator SDK](https://sdk.operatorframework.io/docs/installation/install-operator-sdk/)
+#### Install [Operator SDK](https://sdk.operatorframework.io/docs/installation/install-operator-sdk/) v1.5.0
 
 ```shell script
 brew install operator-sdk
@@ -54,7 +54,7 @@ It is recommended to use a [Kind](https://kind.sigs.k8s.io/) cluster for faster 
 
 Install `cert-manager` with
 ```shell script
-kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.1.0/cert-manager.yaml
+kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.2.0/cert-manager.yaml
 ```
 > Note: You may use the latest version
 

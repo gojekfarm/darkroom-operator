@@ -1,20 +1,21 @@
 package apiserver
 
 import (
+	"context"
 	"errors"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/cache/informertest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+	mgr "sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/gojekfarm/darkroom-operator/internal/controllers"
+	"github.com/gojekfarm/darkroom-operator/internal/runtime"
 	"github.com/gojekfarm/darkroom-operator/internal/testhelper"
 )
 
@@ -28,10 +29,10 @@ func TestManager(t *testing.T) {
 }
 
 func (s *ManagerSuite) SetupSuite() {
-	s.testEnv = testhelper.NewTestEnvironment([]string{filepath.Join("..", "..", "config", "crd", "bases")})
+	s.testEnv = testhelper.NewTestEnvironment("..", "..")
 	r := &controllers.DarkroomReconciler{
 		Log:    s.testEnv.GetLogger().WithName("controllers").WithName("Darkroom"),
-		Scheme: testhelper.Scheme,
+		Scheme: runtime.Scheme(),
 	}
 	s.testEnv.Add(r)
 
@@ -46,6 +47,7 @@ func (s *ManagerSuite) TearDownSuite() {
 
 func (s *ManagerSuite) TestStart() {
 	badPort := -9999
+	clientBuilder := mgr.NewClientBuilder()
 	testcases := []struct {
 		name                string
 		assertCreateErr     bool
@@ -54,14 +56,14 @@ func (s *ManagerSuite) TestStart() {
 		serverPort          *int
 		newMapperFunc       func(cfg *rest.Config, opts ...apiutil.DynamicRESTMapperOption) (meta.RESTMapper, error)
 		newCacheFunc        cache.NewCacheFunc
-		newClientFunc       func(config *rest.Config, options client.Options) (client.Client, error)
+		newClientBuilder    mgr.ClientBuilder
 	}{
 		{
-			name:            "Success",
-			assertCreateErr: false,
-			newMapperFunc:   apiutil.NewDynamicRESTMapper,
-			newCacheFunc:    cache.New,
-			newClientFunc:   client.New,
+			name:             "Success",
+			assertCreateErr:  false,
+			newMapperFunc:    apiutil.NewDynamicRESTMapper,
+			newCacheFunc:     cache.New,
+			newClientBuilder: clientBuilder,
 		},
 		{
 			name:                "SuccessWithCacheAlreadyStarted",
@@ -69,7 +71,7 @@ func (s *ManagerSuite) TestStart() {
 			cacheAlreadyStarted: true,
 			newMapperFunc:       apiutil.NewDynamicRESTMapper,
 			newCacheFunc:        cache.New,
-			newClientFunc:       client.New,
+			newClientBuilder:    clientBuilder,
 		},
 		{
 			name:            "MapperError",
@@ -77,8 +79,8 @@ func (s *ManagerSuite) TestStart() {
 			newMapperFunc: func(cfg *rest.Config, opts ...apiutil.DynamicRESTMapperOption) (meta.RESTMapper, error) {
 				return nil, errors.New("unable to create mapper")
 			},
-			newCacheFunc:  cache.New,
-			newClientFunc: client.New,
+			newCacheFunc:     cache.New,
+			newClientBuilder: clientBuilder,
 		},
 		{
 			name:            "CacheError",
@@ -87,7 +89,7 @@ func (s *ManagerSuite) TestStart() {
 			newCacheFunc: func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
 				return nil, errors.New("unable to create cache")
 			},
-			newClientFunc: client.New,
+			newClientBuilder: clientBuilder,
 		},
 		{
 			name:           "CacheStartError",
@@ -96,35 +98,33 @@ func (s *ManagerSuite) TestStart() {
 			newCacheFunc: func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
 				return &informertest.FakeInformers{Error: errors.New("unable to start cache")}, nil
 			},
-			newClientFunc: client.New,
+			newClientBuilder: clientBuilder,
 		},
 		{
-			name:            "ClientError",
-			assertCreateErr: true,
-			newMapperFunc:   apiutil.NewDynamicRESTMapper,
-			newCacheFunc:    cache.New,
-			newClientFunc: func(config *rest.Config, options client.Options) (client.Client, error) {
-				return nil, errors.New("unable to create client")
-			},
+			name:             "ClientError",
+			assertCreateErr:  true,
+			newMapperFunc:    apiutil.NewDynamicRESTMapper,
+			newCacheFunc:     cache.New,
+			newClientBuilder: &badClientBuilder{},
 		},
 		{
-			name:           "BadServerPort",
-			assertStartErr: true,
-			newMapperFunc:  apiutil.NewDynamicRESTMapper,
-			newCacheFunc:   cache.New,
-			newClientFunc:  client.New,
-			serverPort:     &badPort,
+			name:             "BadServerPort",
+			assertStartErr:   true,
+			newMapperFunc:    apiutil.NewDynamicRESTMapper,
+			newCacheFunc:     cache.New,
+			newClientBuilder: clientBuilder,
+			serverPort:       &badPort,
 		},
 	}
 
 	for _, t := range testcases {
 		s.Run(t.name, func() {
-			stopCh := make(chan struct{})
+			ctx, cancel := context.WithCancel(context.Background())
 			errCh := make(chan error)
 			mf := NewManager(NewManagerFuncOptions{
 				NewDynamicRESTMapper: t.newMapperFunc,
 				NewCache:             t.newCacheFunc,
-				NewClient:            t.newClientFunc,
+				NewClientBuilder:     t.newClientBuilder,
 			})
 			sp := 9999
 			if t.serverPort != nil {
@@ -132,7 +132,7 @@ func (s *ManagerSuite) TestStart() {
 			}
 
 			m, err := mf(s.testEnv.GetConfig(), Options{
-				Scheme:         runtime.NewScheme(),
+				Scheme:         runtime.Scheme(),
 				Port:           sp,
 				AllowedDomains: []string{},
 			})
@@ -142,22 +142,33 @@ func (s *ManagerSuite) TestStart() {
 
 			if t.assertCreateErr {
 				defer close(errCh)
-				defer close(stopCh)
+				defer cancel()
 				s.Error(err)
 			} else {
 				s.NoError(err)
 				go func() {
 					defer close(errCh)
-					errCh <- m.Start(stopCh)
+					errCh <- m.Start(ctx)
 				}()
 				if t.assertStartErr {
-					defer close(stopCh)
+					defer cancel()
 					s.Error(<-errCh)
 				} else {
-					close(stopCh)
+					cancel()
 					s.NoError(<-errCh)
 				}
 			}
 		})
 	}
+}
+
+type badClientBuilder struct {
+}
+
+func (b *badClientBuilder) WithUncached(objs ...client.Object) mgr.ClientBuilder {
+	return b
+}
+
+func (b *badClientBuilder) Build(cache cache.Cache, config *rest.Config, options client.Options) (client.Client, error) {
+	return nil, errors.New("unable to create client")
 }

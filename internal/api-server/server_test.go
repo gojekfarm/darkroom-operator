@@ -9,13 +9,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/gojekfarm/darkroom-operator/internal/testhelper"
 	"github.com/gojekfarm/darkroom-operator/internal/testhelper/mocks"
 )
 
 func TestRunServer(t *testing.T) {
 	errCh := make(chan error)
 	stopCh := make(chan struct{})
-	diagnosticsPort := 9999
+	diagnosticsPort := testhelper.FreePort()
 	em := &mocks.MockEndpointManager{}
 	em.On("Setup", mock.AnythingOfType("*restful.Container"))
 

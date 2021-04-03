@@ -24,13 +24,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	internalRuntime "github.com/gojekfarm/darkroom-operator/internal/runtime"
+	"github.com/gojekfarm/darkroom-operator/internal/testhelper/mocks"
 )
 
 type RootCmdSuite struct {
 	suite.Suite
-	rootCmd *cobra.Command
-	buf     *bytes.Buffer
-	stopCh  chan struct{}
+	rootCmd   *cobra.Command
+	buf       *bytes.Buffer
+	ctx       context.Context
+	cancelCtx func()
 }
 
 func TestRootCmd(t *testing.T) {
@@ -38,7 +42,7 @@ func TestRootCmd(t *testing.T) {
 }
 
 func (s *RootCmdSuite) SetupTest() {
-	s.stopCh = make(chan struct{})
+	s.ctx, s.cancelCtx = context.WithCancel(context.Background())
 	s.buf = &bytes.Buffer{}
 }
 
@@ -54,22 +58,24 @@ func (s *RootCmdSuite) TestControllerStartup() {
 	wg.Add(1)
 
 	mm := &mockManager{}
-	mc := &mockClient{}
+	mc := &mocks.MockClient{RuntimeScheme: internalRuntime.Scheme()}
 
-	mm.On("Start", mock.AnythingOfType("<-chan struct {}")).Return(nil)
+	mm.On("Start", mock.AnythingOfType("*context.cancelCtx")).Return(nil)
 	mm.On("GetClient").Return(mc)
-	mm.On("GetScheme").Return(scheme)
+	mm.On("GetScheme").Return(internalRuntime.Scheme())
 	mm.On("GetConfig").Return(&rest.Config{})
 	mm.On("GetLogger").Return(zap.New(zap.UseDevMode(true)))
 	mm.On("SetFields", mock.Anything).Return(nil)
 	mm.On("Add", mock.AnythingOfType("*controller.Controller")).Return(nil)
+	mm.On("AddHealthzCheck", "healthz", mock.AnythingOfType("healthz.Checker")).Return(nil)
+	mm.On("AddReadyzCheck", "readyz", mock.AnythingOfType("healthz.Checker")).Return(nil)
 
 	s.rootCmd = newRootCmd(rootCmdOpts{
-		SetupSignalHandler: func() <-chan struct{} {
+		SetupSignalHandler: func() context.Context {
 			time.AfterFunc(2*time.Second, func() {
 				wg.Done()
 			})
-			return s.stopCh
+			return s.ctx
 		},
 		NewManager: func(config *rest.Config, options ctrl.Options) (ctrl.Manager, error) {
 			return mm, nil
@@ -86,7 +92,7 @@ func (s *RootCmdSuite) TestControllerStartup() {
 	}()
 
 	wg.Wait()
-	close(s.stopCh)
+	s.cancelCtx()
 	s.NoError(<-errCh)
 }
 
@@ -95,8 +101,8 @@ func (s *RootCmdSuite) TestControllerStartupWithNewManagerError() {
 	managerErr := errors.New("unable to create manager")
 
 	s.rootCmd = newRootCmd(rootCmdOpts{
-		SetupSignalHandler: func() <-chan struct{} {
-			return s.stopCh
+		SetupSignalHandler: func() context.Context {
+			return s.ctx
 		},
 		NewManager: func(config *rest.Config, options ctrl.Options) (ctrl.Manager, error) {
 			return nil, managerErr
@@ -112,7 +118,7 @@ func (s *RootCmdSuite) TestControllerStartupWithNewManagerError() {
 		errCh <- s.rootCmd.Execute()
 	}()
 
-	close(s.stopCh)
+	s.cancelCtx()
 	s.EqualError(<-errCh, managerErr.Error())
 }
 
@@ -121,19 +127,21 @@ func (s *RootCmdSuite) TestControllerStartupWithManagerStartError() {
 	startErr := errors.New("unable to start manager")
 
 	mm := &mockManager{}
-	mc := &mockClient{}
+	mc := &mocks.MockClient{RuntimeScheme: internalRuntime.Scheme()}
 
-	mm.On("Start", mock.AnythingOfType("<-chan struct {}")).Return(startErr)
+	mm.On("Start", mock.AnythingOfType("*context.cancelCtx")).Return(startErr)
 	mm.On("GetClient").Return(mc)
-	mm.On("GetScheme").Return(scheme)
+	mm.On("GetScheme").Return(internalRuntime.Scheme())
 	mm.On("GetConfig").Return(&rest.Config{})
 	mm.On("GetLogger").Return(zap.New(zap.UseDevMode(true)))
 	mm.On("SetFields", mock.Anything).Return(nil)
 	mm.On("Add", mock.AnythingOfType("*controller.Controller")).Return(nil)
+	mm.On("AddHealthzCheck", "healthz", mock.AnythingOfType("healthz.Checker")).Return(nil)
+	mm.On("AddReadyzCheck", "readyz", mock.AnythingOfType("healthz.Checker")).Return(nil)
 
 	s.rootCmd = newRootCmd(rootCmdOpts{
-		SetupSignalHandler: func() <-chan struct{} {
-			return s.stopCh
+		SetupSignalHandler: func() context.Context {
+			return s.ctx
 		},
 		NewManager: func(config *rest.Config, options ctrl.Options) (ctrl.Manager, error) {
 			return mm, nil
@@ -149,7 +157,7 @@ func (s *RootCmdSuite) TestControllerStartupWithManagerStartError() {
 		errCh <- s.rootCmd.Execute()
 	}()
 
-	close(s.stopCh)
+	s.cancelCtx()
 	s.EqualError(<-errCh, startErr.Error())
 }
 
@@ -158,19 +166,21 @@ func (s *RootCmdSuite) TestControllerSetupError() {
 	controllerAddErr := errors.New("can't add controller")
 
 	mm := &mockManager{}
-	mc := &mockClient{}
+	mc := &mocks.MockClient{RuntimeScheme: internalRuntime.Scheme()}
 
-	mm.On("Start", mock.AnythingOfType("<-chan struct {}")).Return(nil)
+	mm.On("Start", mock.AnythingOfType("*context.cancelCtx")).Return(nil)
 	mm.On("GetClient").Return(mc)
-	mm.On("GetScheme").Return(scheme)
+	mm.On("GetScheme").Return(internalRuntime.Scheme())
 	mm.On("GetConfig").Return(&rest.Config{})
 	mm.On("GetLogger").Return(zap.New(zap.UseDevMode(true)))
 	mm.On("SetFields", mock.Anything).Return(nil)
 	mm.On("Add", mock.AnythingOfType("*controller.Controller")).Return(controllerAddErr)
+	mm.On("AddHealthzCheck", "healthz", mock.AnythingOfType("healthz.Checker")).Return(nil)
+	mm.On("AddReadyzCheck", "readyz", mock.AnythingOfType("healthz.Checker")).Return(nil)
 
 	s.rootCmd = newRootCmd(rootCmdOpts{
-		SetupSignalHandler: func() <-chan struct{} {
-			return s.stopCh
+		SetupSignalHandler: func() context.Context {
+			return s.ctx
 		},
 		NewManager: func(config *rest.Config, options ctrl.Options) (ctrl.Manager, error) {
 			return mm, nil
@@ -186,8 +196,85 @@ func (s *RootCmdSuite) TestControllerSetupError() {
 		errCh <- s.rootCmd.Execute()
 	}()
 
-	close(s.stopCh)
+	s.cancelCtx()
 	s.EqualError(<-errCh, controllerAddErr.Error())
+}
+
+func (s *RootCmdSuite) TestControllerAddHealthzCheckError() {
+	errCh := make(chan error)
+	controllerAddHealthzCheckErr := errors.New("can't add healthz check")
+
+	mm := &mockManager{}
+	mc := &mocks.MockClient{RuntimeScheme: internalRuntime.Scheme()}
+
+	mm.On("Start", mock.AnythingOfType("*context.cancelCtx")).Return(nil)
+	mm.On("GetClient").Return(mc)
+	mm.On("GetScheme").Return(internalRuntime.Scheme())
+	mm.On("GetConfig").Return(&rest.Config{})
+	mm.On("GetLogger").Return(zap.New(zap.UseDevMode(true)))
+	mm.On("SetFields", mock.Anything).Return(nil)
+	mm.On("Add", mock.AnythingOfType("*controller.Controller")).Return(nil)
+	mm.On("AddHealthzCheck", "healthz", mock.AnythingOfType("healthz.Checker")).Return(controllerAddHealthzCheckErr)
+
+	s.rootCmd = newRootCmd(rootCmdOpts{
+		SetupSignalHandler: func() context.Context {
+			return s.ctx
+		},
+		NewManager: func(config *rest.Config, options ctrl.Options) (ctrl.Manager, error) {
+			return mm, nil
+		},
+		GetConfigOrDie: func() *rest.Config {
+			return nil
+		},
+	})
+	s.rootCmd.SetOut(s.buf)
+
+	go func() {
+		defer close(errCh)
+		errCh <- s.rootCmd.Execute()
+	}()
+
+	s.cancelCtx()
+	s.EqualError(<-errCh, controllerAddHealthzCheckErr.Error())
+}
+
+func (s *RootCmdSuite) TestControllerAddReadyzCheckError() {
+	errCh := make(chan error)
+	controllerAddReadyzCheckErr := errors.New("can't add readyz check")
+
+	mm := &mockManager{}
+	mc := &mocks.MockClient{RuntimeScheme: internalRuntime.Scheme()}
+
+	mm.On("Start", mock.AnythingOfType("*context.cancelCtx")).Return(nil)
+	mm.On("GetClient").Return(mc)
+	mm.On("GetScheme").Return(internalRuntime.Scheme())
+	mm.On("GetConfig").Return(&rest.Config{})
+	mm.On("GetLogger").Return(zap.New(zap.UseDevMode(true)))
+	mm.On("SetFields", mock.Anything).Return(nil)
+	mm.On("Add", mock.AnythingOfType("*controller.Controller")).Return(nil)
+	mm.On("AddHealthzCheck", "healthz", mock.AnythingOfType("healthz.Checker")).Return(nil)
+	mm.On("AddReadyzCheck", "readyz", mock.AnythingOfType("healthz.Checker")).Return(controllerAddReadyzCheckErr)
+
+	s.rootCmd = newRootCmd(rootCmdOpts{
+		SetupSignalHandler: func() context.Context {
+			return s.ctx
+		},
+		NewManager: func(config *rest.Config, options ctrl.Options) (ctrl.Manager, error) {
+			return mm, nil
+		},
+		GetConfigOrDie: func() *rest.Config {
+			return nil
+		},
+	})
+	s.rootCmd.SetOut(s.buf)
+
+	go func() {
+		defer close(errCh)
+		errCh <- s.rootCmd.Execute()
+	}()
+
+	s.cancelCtx()
+	s.EqualError(<-errCh, controllerAddReadyzCheckErr.Error())
 }
 
 type mockManager struct {
@@ -218,8 +305,8 @@ func (m *mockManager) AddReadyzCheck(name string, check healthz.Checker) error {
 	return m.Called(name, check).Error(0)
 }
 
-func (m *mockManager) Start(i <-chan struct{}) error {
-	return m.Called(i).Error(0)
+func (m *mockManager) Start(ctx context.Context) error {
+	return m.Called(ctx).Error(0)
 }
 
 func (m *mockManager) GetConfig() *rest.Config {
@@ -260,40 +347,4 @@ func (m *mockManager) GetWebhookServer() *webhook.Server {
 
 func (m *mockManager) GetLogger() logr.Logger {
 	return m.Called().Get(0).(logr.Logger)
-}
-
-type mockClient struct {
-	mock.Mock
-}
-
-func (m *mockClient) Get(ctx context.Context, key client.ObjectKey, obj runtime.Object) error {
-	return m.Called(ctx, key, obj).Error(0)
-}
-
-func (m *mockClient) List(ctx context.Context, list runtime.Object, opts ...client.ListOption) error {
-	return m.Called(ctx, list, opts).Error(0)
-}
-
-func (m *mockClient) Create(ctx context.Context, obj runtime.Object, opts ...client.CreateOption) error {
-	return m.Called(ctx, obj, opts).Error(0)
-}
-
-func (m *mockClient) Delete(ctx context.Context, obj runtime.Object, opts ...client.DeleteOption) error {
-	return m.Called(ctx, obj, opts).Error(0)
-}
-
-func (m *mockClient) Update(ctx context.Context, obj runtime.Object, opts ...client.UpdateOption) error {
-	return m.Called(ctx, obj, opts).Error(0)
-}
-
-func (m *mockClient) Patch(ctx context.Context, obj runtime.Object, patch client.Patch, opts ...client.PatchOption) error {
-	return m.Called(ctx, obj, patch, opts).Error(0)
-}
-
-func (m *mockClient) DeleteAllOf(ctx context.Context, obj runtime.Object, opts ...client.DeleteAllOfOption) error {
-	return m.Called(ctx, obj, opts).Error(0)
-}
-
-func (m *mockClient) Status() client.StatusWriter {
-	return m.Called().Get(0).(client.StatusWriter)
 }

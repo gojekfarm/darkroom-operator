@@ -26,6 +26,7 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
@@ -85,6 +86,21 @@ type Darkroom struct {
 	Status DarkroomStatus `json:"status,omitempty"`
 }
 
+func (d *Darkroom) ValidateCreate() error {
+	log.Info("validate create", "name", d.Name)
+	return nil
+}
+
+func (d *Darkroom) ValidateUpdate(old runtime.Object) error {
+	log.Info("validate update", "name", d.Name)
+	return nil
+}
+
+func (d *Darkroom) ValidateDelete() error {
+	log.Info("validate delete", "name", d.Name)
+	return nil
+}
+
 func (d *Darkroom) Default() {
 	log.Info("default", "name", d.Name)
 
@@ -102,9 +118,11 @@ type DarkroomList struct {
 	Items           []Darkroom `json:"items"`
 }
 
-// +kubebuilder:webhook:path=/mutate-deployments-gojek-io-v1alpha1-darkroom,mutating=true,failurePolicy=fail,groups=deployments.gojek.io,resources=darkrooms,verbs=create;update,versions=v1alpha1,name=mdarkroom.gojek.io
+// +kubebuilder:webhook:path=/mutate-deployments-gojek-io-v1alpha1-darkroom,mutating=true,failurePolicy=fail,groups=deployments.gojek.io,resources=darkrooms,verbs=create;update,versions=v1alpha1,name=mdarkroom.gojek.io,sideEffects=None,admissionReviewVersions=v1;v1beta1
+// +kubebuilder:webhook:path=/validate-deployments-gojek-io-v1alpha1-darkroom,mutating=false,failurePolicy=fail,groups=deployments.gojek.io,resources=darkrooms,verbs=create;update;delete,versions=v1alpha1,name=vdarkroom.gojek.io,sideEffects=None,admissionReviewVersions=v1;v1beta1
 
 var _ webhook.Defaulter = &Darkroom{}
+var _ webhook.Validator = &Darkroom{}
 
 func init() {
 	SchemeBuilder.Register(&Darkroom{}, &DarkroomList{})

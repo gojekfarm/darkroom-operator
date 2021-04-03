@@ -19,17 +19,19 @@ GO_BUILD := GOOS=${GOOS} GOARCH=${GOARCH} CGO_ENABLED=0 go build $(LD_FLAGS)
 GO_RUN := GOOS=${GOOS} GOARCH=${GOARCH} CGO_ENABLED=0 go run $(LD_FLAGS)
 GOFLAGS :=
 
+##@ Build
+
 .PHONY: build
-build: builddir fmt vet operator/manager/build apiserver/build ## Dev: Build all binaries
+build: builddir fmt vet operator/manager/build apiserver/build ## Build all binaries
 
 .PHONY: generate
-generate: operator/generate operator/manifests ## Dev: Generate required code and manifests
+generate: operator/generate operator/manifests ## Generate required code and manifests
 
 .PHONY: clean
-clean: clean/build ## Dev: Clean
+clean: clean/build ## Clean
 
 .PHONY: clean/build
-clean/build: ## Dev: Remove .out/ dir
+clean/build: ## Remove build dir
 	@rm -rf $(BUILD_DIR)
 
 builddir:
