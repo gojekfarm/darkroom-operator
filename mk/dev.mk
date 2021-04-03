@@ -1,22 +1,11 @@
-dev/create-cluster: kind
+##@ Development
+
+create-cluster: require/kind ## Create a kind cluster to spin up a dev cluster
 	@$(KIND_BIN) create cluster
 	@operator-sdk olm install
 
-dev/delete-cluster: kind
+delete-cluster: require/kind ## Delete the kind cluster
 	@$(KIND_BIN) delete cluster
 
-dev/load-controller: kind
+load-controller: require/kind ## Load a local container image into the kind cluster
 	@$(KIND_BIN) load docker-image ${IMG}
-
-# find or download golint
-golint:
-ifeq (, $(shell which golint))
-	@{ \
-	cd .. ;\
-	go get golang.org/x/lint/golint ;\
-	cd - ;\
-	}
-GOLINT=$(GOBIN)/golint
-else
-GOLINT=$(shell which golint)
-endif

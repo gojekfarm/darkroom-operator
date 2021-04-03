@@ -7,7 +7,7 @@ GOBIN=$(shell go env GOBIN)
 endif
 
 KIND_BIN = $(shell pwd)/.bin/kind
-kind: ## Download kind locally if necessary.
+require/kind: ## Download kind locally if necessary.
 	$(call go-get-tool,$(KIND_BIN),sigs.k8s.io/kind@v0.10.0)
 
 # go-get-tool will 'go get' any package $2 and install it to $1.

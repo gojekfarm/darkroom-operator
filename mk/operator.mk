@@ -31,23 +31,25 @@ operator/manager/test: operator/generate fmt vet manifests ## Run manager tests
 operator/manager/build: operator/generate ## Build manager binary
 	@$(GO_BUILD) -o $(CONTROLLER_EXECUTABLE) cmd/operator/main.go
 
-operator/install: operator/manifests kustomize ## Install CRDs into a cluster
+##@ Deployment
+
+operator/install: operator/manifests require/kustomize ## Install CRDs into a cluster
 	@$(KUSTOMIZE) build config/crd | kubectl apply -f -
 
-operator/uninstall: operator/manifests kustomize ## Uninstall CRDs from a cluster
+operator/uninstall: operator/manifests require/kustomize ## Uninstall CRDs from a cluster
 	@$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
-operator/deploy: operator/manifests kustomize ## Deploy controller in the configured Kubernetes cluster in ~/.kube/config
+operator/deploy: operator/manifests require/kustomize ## Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 	@cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	@$(KUSTOMIZE) build config/default | kubectl apply -f -
 
 operator/undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	@$(KUSTOMIZE) build config/default | kubectl delete -f -
 
-operator/manifests: controller-gen ## Generate manifests e.g. CRD, RBAC etc.
+operator/manifests: require/controller-gen ## Generate manifests e.g. CRD, RBAC etc.
 	@$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
-operator/generate: controller-gen ## Generate operator code
+operator/generate: require/controller-gen ## Generate operator code
 	@$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 operator/run-olm-build: bundle-build
@@ -74,9 +76,9 @@ bundle-build: ## Build the bundle image
 install: operator/install ## Install all requites to the cluster
 
 CONTROLLER_GEN = $(shell pwd)/.bin/controller-gen
-controller-gen: ## Download controller-gen locally if necessary.
+require/controller-gen: ## Download controller-gen locally if necessary.
 	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.4.1)
 
 KUSTOMIZE = $(shell pwd)/.bin/kustomize
-kustomize: ## Download kustomize locally if necessary.
+require/kustomize: ## Download kustomize locally if necessary.
 	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v3@v3.8.7)

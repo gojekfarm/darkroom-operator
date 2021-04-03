@@ -1,18 +1,20 @@
 GO_TEST := go test $(GOFLAGS) $(LD_FLAGS)
 
+##@ Test
+
 .PHONY: test-ci
-test-ci: kubebuilder check test ## CI: Run tests for all modules and report coverage
+test-ci: kubebuilder check test ## Run tests for all modules and report coverage
 
 .PHONY: test
-test: ## Dev: Run tests for all modules
+test: ## Run tests for all modules
 	@$(GO_TEST) -v ./... -covermode=count -coverprofile=covprofile
 
 .PHONY: coverage
-coverage: goveralls ## Dev: Send coverage report to coveralls
+coverage: require/goveralls ## Send coverage report to coveralls
 	@$(GOVERALLS) -coverprofile=covprofile -service=github
 
 # find or download goveralls
-goveralls:
+require/goveralls:
 ifeq (, $(shell which goveralls))
 	@{ \
 	set -e ;\
