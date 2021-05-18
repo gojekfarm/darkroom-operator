@@ -25,7 +25,7 @@
 .history/
 
 # Test coverage data
-covprofile
+covprofile.out
 
 # Operator SDK generated files
 bundle/

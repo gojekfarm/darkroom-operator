@@ -7,11 +7,13 @@ test-ci: kubebuilder check test ## Run tests for all modules and report coverage
 
 .PHONY: test
 test: ## Run tests for all modules
-	@$(GO_TEST) -v ./... -covermode=count -coverprofile=covprofile
+	@$(GO_TEST) -v ./... -covermode=count -coverprofile=covprofile.out.tmp
+	@cat covprofile.out.tmp | grep -v "zz_generated.deepcopy.go" > covprofile.out
+	@rm covprofile.out.tmp
 
 .PHONY: coverage
 coverage: require/goveralls ## Send coverage report to coveralls
-	@$(GOVERALLS) -coverprofile=covprofile -service=github
+	@$(GOVERALLS) -coverprofile=covprofile.out -service=github
 
 # find or download goveralls
 require/goveralls:

@@ -23,6 +23,15 @@ import (
 	"github.com/gojekfarm/darkroom-operator/internal/runtime"
 )
 
+type waitOptions struct {
+	webhook bool
+	worker  bool
+}
+
+type WaitOption interface {
+	Apply(*waitOptions)
+}
+
 type Environment interface {
 	Start() error
 	Stop() error
@@ -31,11 +40,25 @@ type Environment interface {
 	GetLogs() string
 	GetLogger() logr.Logger
 	ResetLogs()
+	WithWaitOptions(...WaitOption) Environment
+}
+
+type WebhookWaitOption bool
+
+func (w WebhookWaitOption) Apply(options *waitOptions) {
+	options.webhook = bool(w)
+}
+
+type WorkerWaitOption bool
+
+func (w WorkerWaitOption) Apply(options *waitOptions) {
+	options.worker = bool(w)
 }
 
 type env struct {
 	ctx         context.Context
 	cancelCtx   func()
+	waitOptions *waitOptions
 	k8sEnv      *envtest.Environment
 	cfg         *rest.Config
 	logger      logr.Logger
@@ -52,44 +75,54 @@ func (e *env) Start() error {
 	}
 	e.cfg = c
 
-	if len(e.reconcilers) > 0 {
-		e.mgr, err = ctrl.NewManager(c, ctrl.Options{
-			Scheme:             runtime.Scheme(),
-			CertDir:            e.k8sEnv.WebhookInstallOptions.LocalServingCertDir,
-			Host:               e.k8sEnv.WebhookInstallOptions.LocalServingHost,
-			Port:               e.k8sEnv.WebhookInstallOptions.LocalServingPort,
-			MetricsBindAddress: fmt.Sprintf(":%d", FreePort()),
-		})
+	e.mgr, err = ctrl.NewManager(c, ctrl.Options{
+		Scheme:             runtime.Scheme(),
+		CertDir:            e.k8sEnv.WebhookInstallOptions.LocalServingCertDir,
+		Host:               e.k8sEnv.WebhookInstallOptions.LocalServingHost,
+		Port:               e.k8sEnv.WebhookInstallOptions.LocalServingPort,
+		MetricsBindAddress: fmt.Sprintf(":%d", FreePort()),
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	for _, r := range e.reconcilers {
+		if s, ok := r.(setup.Controller); ok {
+			if err := s.SetupControllerWithManager(e.mgr); err != nil {
+				panic(err)
+			}
+		}
+
+		if s, ok := r.(setup.Webhook); ok {
+			if err := s.SetupWebhookWithManager(e.mgr); err != nil {
+				panic(err)
+			}
+		}
+	}
+	go func() {
+		err := e.mgr.Start(e.ctx)
 		if err != nil {
-			panic(err)
+			errCh <- err
 		}
+	}()
 
-		for _, r := range e.reconcilers {
-			if s, ok := r.(setup.Controller); ok {
-				if err := s.SetupControllerWithManager(e.mgr); err != nil {
-					panic(err)
-				}
-			}
-
-			if s, ok := r.(setup.Webhook); ok {
-				if err := s.SetupWebhookWithManager(e.mgr); err != nil {
-					panic(err)
-				}
-			}
-		}
-		go func() {
-			err := e.mgr.Start(e.ctx)
-			if err != nil {
-				errCh <- err
-			}
-		}()
+	if !e.waitOptions.webhook && !e.waitOptions.worker {
+		return nil
 	}
 
 	ticker := time.NewTicker(100 * time.Millisecond)
+	webhookStarted := false
+	workerStarted := false
 	for {
 		select {
 		case <-ticker.C:
-			if strings.Contains(e.buf.String(), "Starting workers") {
+			if e.waitOptions.webhook && strings.Contains(e.buf.String(), "serving webhook server") {
+				webhookStarted = true
+			}
+			if e.waitOptions.worker && strings.Contains(e.buf.String(), "Starting workers") {
+				workerStarted = true
+			}
+			if e.waitOptions.webhook == webhookStarted && e.waitOptions.worker == workerStarted {
 				ticker.Stop()
 				return nil
 			}
@@ -127,6 +160,13 @@ func (e *env) ResetLogs() {
 	e.buf.Reset()
 }
 
+func (e *env) WithWaitOptions(options ...WaitOption) Environment {
+	for _, option := range options {
+		option.Apply(e.waitOptions)
+	}
+	return e
+}
+
 func NewTestEnvironment(dirElems ...string) Environment {
 	b := &bytes.Buffer{}
 	l := zap.New(zap.UseDevMode(true), zap.WriteTo(b), zap.Level(zapcore.DebugLevel))
@@ -140,6 +180,10 @@ func NewTestEnvironment(dirElems ...string) Environment {
 	return &env{
 		ctx:       ctx,
 		cancelCtx: cancel,
+		waitOptions: &waitOptions{
+			webhook: true,
+			worker:  true,
+		},
 		k8sEnv: &envtest.Environment{
 			CRDInstallOptions: envtest.CRDInstallOptions{
 				Paths:              []string{filepath.Join(crdPaths...)},

@@ -48,6 +48,7 @@ import (
 type DarkroomControllerSuite struct {
 	suite.Suite
 	testEnv    testhelper.Environment
+	client     client.Client
 	reconciler *DarkroomReconciler
 }
 
@@ -65,7 +66,8 @@ func (s *DarkroomControllerSuite) SetupSuite() {
 	s.NoError(s.testEnv.Start())
 
 	var err error
-	s.reconciler.Client, err = testhelper.NewClient(s.testEnv.GetConfig())
+	s.client, err = testhelper.NewClient(s.testEnv.GetConfig())
+	s.reconciler.Client = s.client
 	s.NoError(err)
 }
 
