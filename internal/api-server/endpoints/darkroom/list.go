@@ -14,6 +14,6 @@ func (e *Endpoint) list(request *restful.Request, response *restful.Response) {
 		if err := e.client.List(request.Request.Context(), dl, &client.ListOptions{Namespace: ns}); err != nil {
 			return err
 		}
-		return response.WriteAsJson(From.List(dl))
+		return response.WriteAsJson(dl)
 	}, "Unable to list darkrooms instances")
 }

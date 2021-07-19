@@ -14,6 +14,6 @@ func (e *Endpoint) get(request *restful.Request, response *restful.Response) {
 		if err := e.client.Get(request.Request.Context(), client.ObjectKey{Namespace: ns, Name: n}, d); err != nil {
 			return err
 		}
-		return response.WriteAsJson(From.Object(d))
+		return response.WriteAsJson(d)
 	}, "Unable to get instance "+n)
 }
