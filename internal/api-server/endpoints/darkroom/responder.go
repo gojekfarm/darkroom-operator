@@ -12,17 +12,15 @@ func (e *Endpoint) respond(response *restful.Response, f func() error, errMsg st
 	if err := f(); err != nil {
 		apiErr := &apiErrors.StatusError{}
 		if errors.As(err, &apiErr) {
-			_ = response.WriteAsJson(Error{
+			_ = response.WriteHeaderAndEntity(int(apiErr.Status().Code), Error{
 				Message: errMsg,
 				Err:     apiErr.Status().Message,
-				Code:    int(apiErr.Status().Code),
 			})
 			return
 		}
-		_ = response.WriteAsJson(Error{
+		_ = response.WriteHeaderAndEntity(http.StatusFailedDependency, Error{
 			Message: errMsg,
 			Err:     err.Error(),
-			Code:    http.StatusFailedDependency,
 		})
 	}
 }
