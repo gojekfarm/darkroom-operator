@@ -37,12 +37,11 @@ clean/build: ## Remove build dir
 builddir:
 	@mkdir -p $(BUILD_DIR)
 
-KUBEBUILDER := $(shell command -v /usr/local/kubebuilder/bin/kubebuilder 2> /dev/null)
-
+KUBEBUILDER := $(shell command -v /usr/local/bin/kubebuilder 2> /dev/null)
 # download kubebuilder if necessary
 kubebuilder:
 ifndef KUBEBUILDER
 	@bin/install-kubebuilder
 else
-KUBEBUILDER := /usr/local/kubebuilder/bin/kubebuilder
+KUBEBUILDER := /usr/local/bin/kubebuilder
 endif

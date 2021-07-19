@@ -50,9 +50,15 @@ type DarkroomReconciler struct {
 
 // +kubebuilder:rbac:groups=deployments.gojek.io,resources=darkrooms,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=deployments.gojek.io,resources=darkrooms/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=deployments.gojek.io,resources=darkrooms/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=configmaps;services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="apps",resources=deployments,verbs=get;list;watch;create;update;patch;delete
 
+// Reconcile is part of the main kubernetes reconciliation loop which aims to
+// move the current state of darkroom instances inside the cluster closer to the desired state.
+//
+// For more details, check Reconcile and its Result here:
+// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.8.3/pkg/reconcile
 func (r *DarkroomReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	l := r.Log.WithValues("darkroom", req.NamespacedName)
 	l.Info("reconciling")
