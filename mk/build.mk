@@ -22,7 +22,7 @@ GOFLAGS :=
 ##@ Build
 
 .PHONY: build
-build: builddir fmt vet operator/manager/build apiserver/build ## Build all binaries
+build: builddir fmt vet operator/manager/build apiserver/build operator/docker-build ## Build all binaries
 
 .PHONY: generate
 generate: operator/generate operator/manifests ## Generate required code and manifests
