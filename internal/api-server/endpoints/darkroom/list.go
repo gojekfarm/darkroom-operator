@@ -11,7 +11,7 @@ func (e *Endpoint) list(request *restful.Request, response *restful.Response) {
 	ns := request.PathParameter("namespace")
 	e.respond(response, func() error {
 		dl := new(v1alpha1.DarkroomList)
-		if err := e.client.List(request.Request.Context(), dl, &client.ListOptions{Namespace: ns}); err != nil {
+		if err := e.client.List(request.Request.Context(), dl, client.InNamespace(ns)); err != nil {
 			return err
 		}
 		return response.WriteAsJson(dl)

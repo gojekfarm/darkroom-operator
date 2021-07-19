@@ -4,8 +4,9 @@ import (
 	"net/http"
 
 	"github.com/emicklei/go-restful/v3"
-	"github.com/gojekfarm/darkroom-operator/pkg/api/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/gojekfarm/darkroom-operator/pkg/api/v1alpha1"
 )
 
 func (e *Endpoint) create(request *restful.Request, response *restful.Response) {
@@ -18,8 +19,7 @@ func (e *Endpoint) create(request *restful.Request, response *restful.Response) 
 			return err
 		}
 		d.Namespace = request.PathParameter("namespace")
-		if err := e.client.Create(request.Request.Context(), d, &client.CreateOptions{FieldManager: "api-server"});
-			err != nil {
+		if err := e.client.Create(request.Request.Context(), d, client.FieldOwner("api-server")); err != nil {
 			return err
 		}
 		return response.WriteHeaderAndEntity(http.StatusCreated, d)

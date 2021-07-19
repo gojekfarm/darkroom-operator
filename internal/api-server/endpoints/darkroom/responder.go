@@ -1,7 +1,7 @@
 package darkroom
 
 import (
-	"errors"
+	"encoding/json"
 	"net/http"
 
 	"github.com/emicklei/go-restful/v3"
@@ -10,17 +10,24 @@ import (
 
 func (e *Endpoint) respond(response *restful.Response, f func() error, errMsg string) {
 	if err := f(); err != nil {
-		apiErr := &apiErrors.StatusError{}
-		if errors.As(err, &apiErr) {
-			_ = response.WriteHeaderAndEntity(int(apiErr.Status().Code), Error{
-				Message: errMsg,
-				Err:     apiErr.Status().Message,
-			})
-			return
+		code := http.StatusFailedDependency
+		errStr := err.Error()
+
+		switch err := err.(type) {
+		case *apiErrors.StatusError:
+			code = int(err.Status().Code)
+			errStr = err.Status().Message
+		case restful.ServiceError:
+			code = err.Code
+			errMsg = err.Message
+		case *json.SyntaxError:
+			code = http.StatusUnprocessableEntity
 		}
-		_ = response.WriteHeaderAndEntity(http.StatusFailedDependency, Error{
+
+		response.WriteHeader(code)
+		_ = response.WriteAsJson(Error{
 			Message: errMsg,
-			Err:     err.Error(),
+			Err:     errStr,
 		})
 	}
 }

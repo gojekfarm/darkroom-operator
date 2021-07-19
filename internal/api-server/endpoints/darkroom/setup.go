@@ -4,8 +4,9 @@ import (
 	"net/http"
 
 	"github.com/emicklei/go-restful/v3"
-	"github.com/gojekfarm/darkroom-operator/pkg/api/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/gojekfarm/darkroom-operator/pkg/api/v1alpha1"
 )
 
 type Endpoint struct {
@@ -21,6 +22,7 @@ func (e *Endpoint) SetupWithWS(ws *restful.WebService) {
 	ws.Route(ws.POST("{namespace}/darkrooms").To(e.create).
 		Param(ws.PathParameter("namespace", "namespace of darkroom instances").DataType("string")).
 		Doc("Create new Darkroom instance").
+		Reads(&v1alpha1.Darkroom{}).
 		Returns(http.StatusCreated, "CREATED", &v1alpha1.Darkroom{}))
 
 	ws.Route(ws.GET("{namespace}/darkrooms/{name}").To(e.get).
