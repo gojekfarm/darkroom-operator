@@ -3,7 +3,7 @@ module github.com/gojekfarm/darkroom-operator
 go 1.16
 
 require (
-	github.com/emicklei/go-restful v2.15.0+incompatible
+	github.com/emicklei/go-restful/v3 v3.5.2
 	github.com/go-logr/logr v0.4.0
 	github.com/spf13/cobra v1.2.1
 	github.com/stretchr/testify v1.7.0

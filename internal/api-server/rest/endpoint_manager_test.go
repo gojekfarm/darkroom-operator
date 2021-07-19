@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/emicklei/go-restful"
+	"github.com/emicklei/go-restful/v3"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/gojekfarm/darkroom-operator/internal/runtime"

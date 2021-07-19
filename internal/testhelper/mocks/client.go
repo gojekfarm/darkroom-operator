@@ -2,6 +2,7 @@ package mocks
 
 import (
 	"context"
+	"testing"
 
 	"github.com/stretchr/testify/mock"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -9,6 +10,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+func NewMockClient(t *testing.T) *MockClient {
+	m := &MockClient{}
+	m.Test(t)
+	return m
+}
 
 type MockClient struct {
 	mock.Mock

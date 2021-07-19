@@ -1,6 +1,6 @@
 package rest
 
-import "github.com/emicklei/go-restful"
+import "github.com/emicklei/go-restful/v3"
 
 type Endpoint interface {
 	SetupWithWS(ws *restful.WebService)

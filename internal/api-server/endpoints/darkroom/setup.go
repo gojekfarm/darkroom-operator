@@ -1,8 +1,12 @@
 package darkroom
 
 import (
-	"github.com/emicklei/go-restful"
+	"net/http"
+
+	"github.com/emicklei/go-restful/v3"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/gojekfarm/darkroom-operator/pkg/api/v1alpha1"
 )
 
 type Endpoint struct {
@@ -10,9 +14,29 @@ type Endpoint struct {
 }
 
 func (e *Endpoint) SetupWithWS(ws *restful.WebService) {
-	ws.Route(ws.GET("darkrooms").To(e.list).
+	ws.Route(ws.GET("{namespace}/darkrooms").To(e.list).
+		Param(ws.PathParameter("namespace", "namespace of darkroom instances").DataType("string")).
 		Doc("List of Darkrooms").
-		Returns(200, "OK", &List{}))
+		Returns(http.StatusOK, "OK", &v1alpha1.DarkroomList{}))
+
+	ws.Route(ws.POST("{namespace}/darkrooms").To(e.create).
+		Param(ws.PathParameter("namespace", "namespace of darkroom instances").DataType("string")).
+		Doc("Create new Darkroom instance").
+		Reads(&v1alpha1.Darkroom{}).
+		Returns(http.StatusCreated, "CREATED", &v1alpha1.Darkroom{}))
+
+	ws.Route(ws.GET("{namespace}/darkrooms/{name}").To(e.get).
+		Param(ws.PathParameter("namespace", "namespace of darkroom instances").DataType("string")).
+		Param(ws.PathParameter("name", "identifier of darkroom instance").DataType("string")).
+		Doc("Get Darkroom Instance").
+		Returns(http.StatusOK, "OK", &v1alpha1.Darkroom{}))
+
+	ws.Route(ws.DELETE("{namespace}/darkrooms/{name}").To(e.delete).
+		Param(ws.PathParameter("namespace", "namespace of darkroom instances").DataType("string")).
+		Param(ws.PathParameter("name", "identifier of darkroom instance").DataType("string")).
+		Doc("Delete Darkroom Instance").
+		Returns(http.StatusNoContent, "NO CONTENT", &v1alpha1.Darkroom{}))
+
 }
 
 func NewEndpoint(client client.Client) *Endpoint {

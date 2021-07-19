@@ -55,7 +55,7 @@ operator/generate: require/controller-gen ## Generate operator code
 operator/run-olm-build: bundle-build
 	@operator-sdk run bundle $(BUNDLE_IMG)
 
-operator/docker-build: test ## Build the docker image
+operator/docker-build: ## Build the docker image
 	@docker build -f build/package/operator.Dockerfile -t ${IMG} .
 
 operator/docker-push: ## Push the docker image
