@@ -46,6 +46,12 @@ rules:
 - apiGroups:
   - deployments.gojek.io
   resources:
+  - darkrooms/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - deployments.gojek.io
+  resources:
   - darkrooms/status
   verbs:
   - get

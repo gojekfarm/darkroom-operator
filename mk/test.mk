@@ -1,5 +1,8 @@
 GO_TEST := go test $(GOFLAGS) $(LD_FLAGS)
 
+.EXPORT_ALL_VARIABLES:
+KUBEBUILDER_ASSETS := /usr/local/bin
+
 ##@ Test
 
 .PHONY: test-ci
