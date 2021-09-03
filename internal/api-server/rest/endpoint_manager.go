@@ -3,7 +3,7 @@ package rest
 import (
 	"os"
 
-	"github.com/emicklei/go-restful"
+	"github.com/emicklei/go-restful/v3"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/gojekfarm/darkroom-operator/internal/api-server/endpoints/darkroom"
